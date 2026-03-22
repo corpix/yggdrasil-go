@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 # Connects nodes in a network resembling an s-channel feynmann diagram.
 

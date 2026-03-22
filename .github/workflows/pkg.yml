@@ -68,69 +68,6 @@ jobs:
           path: "*.deb"
           if-no-files-found: error
 
-  build-packages-macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        pkgarch: ["amd64", "arm64"]
-
-    name: Package (macOS, ${{ matrix.pkgarch }})
-
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
-
-      - name: Build package
-        env:
-          PKGARCH: ${{ matrix.pkgarch }}
-        run: sh contrib/macos/create-pkg.sh
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS package (${{ matrix.pkgarch }})
-          path: "*.pkg"
-          if-no-files-found: error
-
-  build-packages-windows:
-    strategy:
-      fail-fast: false
-      matrix:
-        pkgarch: ["x64", "x86", "arm64"]
-
-    name: Package (Windows, ${{ matrix.pkgarch }})
-
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
-
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v4
-
-      - name: Build package
-        run: sh contrib/msi/build-msi.sh ${{ matrix.pkgarch }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows package (${{ matrix.pkgarch }})
-          path: "*.msi"
-          if-no-files-found: error
-
   build-packages-router:
     strategy:
       fail-fast: false
