@@ -10,16 +10,23 @@ set -e
 
 conf1="${1:-}"
 conf2="${2:-}"
-tmpconf1=""
-tmpconf2=""
+
+cleanup() {
+  ip link delete veth11 2>/dev/null || true
+  ip link delete veth12 2>/dev/null || true
+  ip netns delete node1 2>/dev/null || true
+  ip netns delete node2 2>/dev/null || true
+}
+
+trap cleanup EXIT
+
 
 make_config() {
   local src="$1"
   local admin="$2"
-  local dst="$3"
 
   if [ -z "$src" ]; then
-    printf '{AdminListen: "%s"}\n' "$admin" > "$dst"
+    printf '{AdminListen: "%s"}\n' "$admin"
     return
   fi
 
@@ -30,7 +37,7 @@ make_config() {
 
   hjson-cli -j "$src" \
     | jq --arg admin "$admin" '.AdminListen = $admin' \
-    | hjson-cli > "$dst"
+    | hjson-cli
 }
 
 ip netns add node1
@@ -50,22 +57,17 @@ ip netns exec node2 tc qdisc add dev veth21 root tbf rate 10mbit burst 8192 late
 ip netns exec node1 tc qdisc add dev veth12 root tbf rate 100mbit burst 8192 latency 1ms
 ip netns exec node2 tc qdisc add dev veth22 root tbf rate 100mbit burst 8192 latency 1ms
 
-tmpconf1="$(mktemp)"
-tmpconf2="$(mktemp)"
-make_config "$conf1" "unix://node1.sock" "$tmpconf1"
-make_config "$conf2" "unix://node2.sock" "$tmpconf2"
+ip netns exec node1 env PPROFLISTEN=localhost:6060 ./yggdrasil \
+   -loglevel debug \
+   -useconffile <(make_config "$conf1" "unix://node1.sock") \
+   &> node1.log &
+ip netns exec node2 env PPROFLISTEN=localhost:6060 ./yggdrasil \
+   -loglevel debug \
+   -useconffile <(make_config "$conf2" "unix://node2.sock") \
+   &> node2.log &
 
-ip netns exec node1 env PPROFLISTEN=localhost:6060 ./yggdrasil -logging "info,warn,error,debug" -useconffile "$tmpconf1" &> node1.log &
-ip netns exec node2 env PPROFLISTEN=localhost:6060 ./yggdrasil -logging "info,warn,error,debug" -useconffile "$tmpconf2" &> node2.log &
-
-echo "Started, to continue you should (possibly w/ sudo):"
-echo "kill" $(jobs -p)
+echo "Started, to continue you should:"
+echo -e "\tsudo kill" $(jobs -p)
 wait
 
-rm -f "$tmpconf1" "$tmpconf2"
-
-ip netns delete node1
-ip netns delete node2
-
-ip link delete veth11
-ip link delete veth12
+cleanup

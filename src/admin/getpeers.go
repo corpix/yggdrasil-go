@@ -22,6 +22,7 @@ type PeerEntry struct {
 	URI           string        `json:"remote,omitempty"`
 	Up            bool          `json:"up"`
 	Inbound       bool          `json:"inbound"`
+	SNI           string        `json:"sni,omitempty"`
 	IPAddress     string        `json:"address,omitempty"`
 	PublicKey     string        `json:"key"`
 	Port          uint64        `json:"port"`
@@ -45,6 +46,7 @@ func (a *AdminSocket) getPeersHandler(req *GetPeersRequest, res *GetPeersRespons
 			Port:     p.Port,
 			Up:       p.Up,
 			Inbound:  p.Inbound,
+			SNI:      p.SNI,
 			Priority: uint64(p.Priority), // can't be uint8 thanks to gobind
 			Cost:     p.Cost,
 			URI:      p.URI,

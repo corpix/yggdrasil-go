@@ -42,6 +42,7 @@ type Core struct {
 		nodeinfo           NodeInfo                   // immutable after startup
 		nodeinfoPrivacy    NodeInfoPrivacy            // immutable after startup
 		_allowedPublicKeys map[[32]byte]struct{}      // configurable after startup
+		outboundSNIList    []string                   // immutable after startup
 	}
 	pathNotify func(ed25519.PublicKey)
 }

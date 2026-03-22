@@ -203,6 +203,7 @@ func main() {
 			core.PeerFilter(func(ip net.IP) bool {
 				return !iprange.Contains(ip)
 			}),
+			core.OutboundSNIList(cfg.OutboundSNIList),
 		}
 		for _, addr := range cfg.Listen {
 			options = append(options, core.ListenAddress(addr))

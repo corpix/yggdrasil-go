@@ -23,6 +23,7 @@ type PeerInfo struct {
 	URI           string
 	Up            bool
 	Inbound       bool
+	SNI           string
 	LastError     error
 	LastErrorTime time.Time
 	Key           ed25519.PublicKey
@@ -87,6 +88,7 @@ func (c *Core) GetPeers() []PeerInfo {
 				conn = c
 				peerinfo.Up = true
 				peerinfo.Inbound = state.linkType == linkTypeIncoming
+				peerinfo.SNI = state.sni
 				peerinfo.RXBytes = atomic.LoadUint64(&c.rx)
 				peerinfo.TXBytes = atomic.LoadUint64(&c.tx)
 				peerinfo.RXRate = atomic.LoadUint64(&c.rxrate)

@@ -44,6 +44,7 @@ type NodeConfig struct {
 	PrivateKeyPath      string                     `json:",omitempty" comment:"The path to your private key file in PEM format."`
 	Certificate         *tls.Certificate           `json:"-"`
 	Peers               []string                   `comment:"List of outbound peer connection strings (e.g. tls://a.b.c.d:e or\nsocks://a.b.c.d:e/f.g.h.i:j). Connection strings can contain options,\nsee https://yggdrasil-network.github.io/configurationref.html#peers.\nYggdrasil has no concept of bootstrap nodes - all network traffic\nwill transit peer connections. Therefore make sure to only peer with\nnearby nodes that have good connectivity and low latency. Avoid adding\npeers to this list from distant countries as this will worsen your\nnode's connectivity and performance considerably."`
+	OutboundSNIList     []string                   `comment:"Optional list of SNI hostnames to use for outbound TLS-capable links.\nIf a peer does not specify ?sni=, a stable SNI is chosen from this list\nper peer (sticky selection) to improve DPI resistance."`
 	InterfacePeers      map[string][]string        `comment:"List of connection strings for outbound peer connections in URI format,\narranged by source interface, e.g. { \"eth0\": [ \"tls://a.b.c.d:e\" ] }.\nYou should only use this option if your machine is multi-homed and you\nwant to establish outbound peer connections on different interfaces.\nOtherwise you should use \"Peers\"."`
 	Listen              []string                   `comment:"Listen addresses for incoming connections. You will need to add\nlisteners in order to accept incoming peerings from non-local nodes.\nThis is not required if you wish to establish outbound peerings only.\nMulticast peer discovery will work regardless of any listeners set\nhere. Each listener should be specified in URI format as above, e.g.\ntls://0.0.0.0:0 or tls://[::]:0 to listen on all interfaces."`
 	AdminListen         string                     `json:",omitempty" comment:"Listen address for admin connections. Default is to listen for local\nconnections either on TCP/9001 or a UNIX socket depending on your\nplatform. Use this value for yggdrasilctl -endpoint=X. To disable\nthe admin socket, use the value \"none\" instead."`
@@ -77,6 +78,7 @@ func GenerateConfig() *NodeConfig {
 	cfg.Listen = []string{}
 	cfg.AdminListen = defaults.DefaultAdminListen
 	cfg.Peers = []string{}
+	cfg.OutboundSNIList = []string{}
 	cfg.InterfacePeers = map[string][]string{}
 	cfg.AllowedPublicKeys = []string{}
 	cfg.MulticastInterfaces = defaults.DefaultMulticastInterfaces

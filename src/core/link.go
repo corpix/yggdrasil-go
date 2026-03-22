@@ -3,12 +3,15 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -63,6 +66,7 @@ type link struct {
 	kick      chan struct{}      // Attempt to reconnect now, if backing off
 	linkType  linkType           // Type of link, i.e. outbound/inbound, persistent/ephemeral
 	linkProto string             // Protocol carrier of link, e.g. TCP, AWDL
+	sni       string             // Last observed/used SNI for this link
 	// The remaining fields can only be modified safely from within the links actor
 	_conn    *linkConn // Connected link, if any, nil if not connected
 	_err     error     // Last error on the connection, if any
@@ -176,8 +180,10 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 		options := linkOptions{
 			maxBackoff: defaultBackoffLimit,
 		}
+		var keyIDs []string
 		for _, pubkey := range u.Query()["key"] {
-			sigPub, err := hex.DecodeString(pubkey)
+			normalized := strings.ToLower(pubkey)
+			sigPub, err := hex.DecodeString(normalized)
 			if err != nil {
 				retErr = ErrLinkPinnedKeyInvalid
 				return
@@ -188,6 +194,7 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 				options.pinnedEd25519Keys = map[keyArray]struct{}{}
 			}
 			options.pinnedEd25519Keys[sigPubKey] = struct{}{}
+			keyIDs = append(keyIDs, normalized)
 		}
 		if p := u.Query().Get("priority"); p != "" {
 			pi, err := strconv.ParseUint(p, 10, 8)
@@ -218,6 +225,11 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 		// IP address successfully or not.
 		if sni := u.Query().Get("sni"); sni != "" {
 			if net.ParseIP(sni) == nil {
+				options.tlsSNI = sni
+			}
+		}
+		if options.tlsSNI == "" {
+			if sni := l.stickySNI(u, keyIDs); sni != "" {
 				options.tlsSNI = sni
 			}
 		}
@@ -368,6 +380,7 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 						doRet = true
 					}
 					state._conn = lc
+					state.sni = options.tlsSNI
 					state._err = nil
 					state._errtime = time.Now()
 				})
@@ -558,6 +571,7 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 					// Update the link state with our newly wrapped connection.
 					// Clear the error state.
 					state._conn = lc
+					state.sni = ""
 					state._err = nil
 					state._errtime = time.Time{}
 
@@ -575,7 +589,14 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 
 				// Give the connection to the handler. The handler will block
 				// for the lifetime of the connection.
-				switch err = l.handler(linkTypeIncoming, options, lc, nil, local); {
+				optionsLocal := options
+				if sni, err := connSNI(lc); err == nil && sni != "" {
+					optionsLocal.tlsSNI = sni
+					phony.Block(l, func() {
+						state.sni = sni
+					})
+				}
+				switch err = l.handler(linkTypeIncoming, optionsLocal, lc, nil, local); {
 				case err == nil:
 				case errors.Is(err, io.EOF):
 				case errors.Is(err, net.ErrClosed):
@@ -635,6 +656,7 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 	if err := conn.SetDeadline(time.Now().Add(time.Second * 6)); err != nil {
 		return fmt.Errorf("failed to set handshake deadline: %w", err)
 	}
+	logSNI := options.tlsSNI
 	n, err := conn.Write(metaBytes)
 	switch {
 	case err != nil:
@@ -694,6 +716,9 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 	}
 	remoteAddr := net.IP(address.AddrForKey(meta.publicKey)[:]).String()
 	remoteStr := fmt.Sprintf("%s@%s", remoteAddr, conn.RemoteAddr())
+	if logSNI != "" {
+		remoteStr = fmt.Sprintf("%s[sni=%s]", remoteStr, logSNI)
+	}
 	localStr := conn.LocalAddr()
 	priority := options.priority
 	if meta.priority > priority {
@@ -715,6 +740,23 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 			dir, remoteStr, localStr, err)
 	}
 	return err
+}
+
+func connSNI(conn net.Conn) (string, error) {
+	if conn == nil {
+		return "", nil
+	}
+	if lc, ok := conn.(*linkConn); ok {
+		conn = lc.Conn
+	}
+	tlsConn, ok := conn.(*tls.Conn)
+	if !ok {
+		return "", nil
+	}
+	if err := tlsConn.Handshake(); err != nil {
+		return "", err
+	}
+	return tlsConn.ConnectionState().ServerName, nil
 }
 
 func (l *links) findSuitableIP(url *url.URL, fn func(hostname string, ip net.IP, port int) (net.Conn, error)) (net.Conn, error) {
@@ -766,6 +808,41 @@ func (l *links) findSuitableIP(url *url.URL, fn func(hostname string, ip net.IP,
 func urlForLinkInfo(u url.URL) url.URL {
 	u.RawQuery = ""
 	return u
+}
+
+func (l *links) stickySNI(u *url.URL, keyIDs []string) string {
+	if len(l.core.config.outboundSNIList) == 0 {
+		return ""
+	}
+	candidates := make([]string, 0, len(l.core.config.outboundSNIList))
+	for _, sni := range l.core.config.outboundSNIList {
+		sni = strings.TrimSpace(sni)
+		if sni == "" {
+			continue
+		}
+		if net.ParseIP(sni) != nil {
+			continue
+		}
+		candidates = append(candidates, sni)
+	}
+	if len(candidates) == 0 {
+		return ""
+	}
+	peerID := ""
+	if len(keyIDs) > 0 {
+		sort.Strings(keyIDs)
+		peerID = "key:" + keyIDs[0]
+	} else if u.Host != "" {
+		peerID = "host:" + strings.ToLower(u.Host)
+	} else {
+		peerID = "url:" + u.String()
+	}
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(u.Scheme))
+	_, _ = hasher.Write([]byte{0})
+	_, _ = hasher.Write([]byte(peerID))
+	idx := int(hasher.Sum64() % uint64(len(candidates)))
+	return candidates[idx]
 }
 
 type linkConn struct {
