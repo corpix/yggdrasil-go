@@ -186,34 +186,52 @@ func (m *version_metadata) decodeTLV(r io.Reader) (sig []byte, err error) {
 
 	for len(bs) >= 4 {
 		op := binary.BigEndian.Uint16(bs[:2])
-		oplen := binary.BigEndian.Uint16(bs[2:4])
-		if bs = bs[4:]; len(bs) < int(oplen) {
-			break
+		oplen := int(binary.BigEndian.Uint16(bs[2:4]))
+		if bs = bs[4:]; len(bs) < oplen {
+			return nil, ErrHandshakeInvalidLength
 		}
+		field := bs[:oplen]
 		switch op {
 		case metaVersionMajor:
-			m.majorVer = binary.BigEndian.Uint16(bs[:2])
+			if len(field) != 2 {
+				return nil, ErrHandshakeInvalidLength
+			}
+			m.majorVer = binary.BigEndian.Uint16(field)
+
 		case metaVersionMinor:
-			m.minorVer = binary.BigEndian.Uint16(bs[:2])
+			if len(field) != 2 {
+				return nil, ErrHandshakeInvalidLength
+			}
+			m.minorVer = binary.BigEndian.Uint16(field)
+
 		case metaPublicKey:
-			m.publicKey = make(ed25519.PublicKey, ed25519.PublicKeySize)
-			copy(m.publicKey, bs[:ed25519.PublicKeySize])
+			if len(field) != ed25519.PublicKeySize {
+				return nil, ErrHandshakeInvalidLength
+			}
+			m.publicKey = append(m.publicKey[:0], field...)
+
 		case metaPriority:
-			m.priority = bs[0]
+			if len(field) != 1 {
+				return nil, ErrHandshakeInvalidLength
+			}
+			m.priority = field[0]
 		case metaFeatures:
 			if oplen >= 8 {
-				m.features = binary.BigEndian.Uint64(bs[:8])
+				m.features = binary.BigEndian.Uint64(field[:8])
 			}
 		case metaCommunityProof:
-			m.communityProof = append([]byte(nil), bs[:oplen]...)
+			m.communityProof = append([]byte(nil), field...)
 		case metaNodeInfo:
 			if oplen > 16384 {
 				return nil, fmt.Errorf("received NodeInfo exceeds max length of 16384 bytes")
 			}
 			m.nodeInfo = make([]byte, oplen)
-			copy(m.nodeInfo, bs[:oplen])
+			copy(m.nodeInfo, field)
 		}
 		bs = bs[oplen:]
+	}
+	if len(bs) != 0 {
+		return nil, ErrHandshakeInvalidLength
 	}
 	return sig, nil
 }
