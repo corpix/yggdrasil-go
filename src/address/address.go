@@ -4,6 +4,7 @@ package address
 
 import (
 	"crypto/ed25519"
+	"errors"
 )
 
 // Address represents an IPv6 address in the yggdrasil address range.
@@ -12,12 +13,30 @@ type Address [16]byte
 // Subnet represents an IPv6 /64 subnet in the yggdrasil subnet range.
 type Subnet [8]byte
 
+// globalPrefix is the active address prefix byte. Defaults to 0x02 (200::/7).
+// Must be even: the low bit is reserved to distinguish node addresses (0) from
+// /64 subnet prefixes (1). Set once at startup via SetPrefix before any node is
+// created; never change it while a node is running.
+var globalPrefix = [1]byte{0x02}
+
+// SetPrefix configures the address prefix byte used by this node.
+// p must be even — the low bit is reserved to distinguish nodes (bit=0) from
+// /64 subnet prefixes (bit=1). All nodes in the same network must use the same
+// prefix; nodes with different prefixes cannot exchange IP packets.
+func SetPrefix(p byte) error {
+	if p&0x01 != 0 {
+		return errors.New("address prefix byte must be even (low bit is reserved for node/subnet distinction)")
+	}
+	globalPrefix = [1]byte{p}
+	return nil
+}
+
 // GetPrefix returns the address prefix used by yggdrasil.
 // The current implementation requires this to be a multiple of 8 bits + 7 bits.
 // The 8th bit of the last byte is used to signal nodes (0) or /64 prefixes (1).
 // Nodes that configure this differently will be unable to communicate with each other using IP packets, though routing and the DHT machinery *should* still work.
 func GetPrefix() [1]byte {
-	return [...]byte{0x02}
+	return globalPrefix
 }
 
 // IsValid returns true if an address falls within the range used by nodes in the network.

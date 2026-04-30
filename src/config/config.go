@@ -57,6 +57,8 @@ type NodeConfig struct {
 	NodeInfo            map[string]interface{}     `comment:"Optional nodeinfo. This must be a { \"key\": \"value\", ... } map\nor set as null. This is entirely optional but, if set, is visible\nto the whole network on request."`
 	PrometheusEnabled   bool                       `json:",omitempty" comment:"Enable the built-in Prometheus metrics endpoint. Disabled by default."`
 	PrometheusListen    string                     `json:",omitempty" comment:"Listen address for the Prometheus metrics HTTP endpoint.\nDefaults to 127.0.0.1:9756 when PrometheusEnabled is true."`
+	Community           string                     `json:",omitempty" comment:"Optional community string for private network isolation. When set, only\nnodes with the same community string can peer with this node. The string\nis never transmitted in plaintext — it is used as a cryptographic key\nin the handshake signature. Leave empty to disable (default)."`
+	AddressPrefix       string                     `json:",omitempty" comment:"First byte of the IPv6 address prefix as a two-character hex string\n(e.g. \"02\" = 200::/7, \"04\" = 400::/7, \"fc\" = FC00::/7). Must be an\neven value — the low bit is reserved for internal use. All nodes in\nthe same network must use the same prefix. Defaults to \"02\"."`
 }
 
 type MulticastInterfaceConfig struct {

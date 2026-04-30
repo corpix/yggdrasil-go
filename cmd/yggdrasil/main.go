@@ -193,10 +193,23 @@ func main() {
 
 	n := &node{}
 
+	// Apply address prefix before any node setup so that all address
+	// derivation and validation uses the configured range.
+	if cfg.AddressPrefix != "" {
+		b, err := hex.DecodeString(cfg.AddressPrefix)
+		if err != nil || len(b) != 1 {
+			panic("AddressPrefix must be a two-character hex string, e.g. \"02\"")
+		}
+		if err := address.SetPrefix(b[0]); err != nil {
+			panic(err)
+		}
+	}
+
 	// Set up the Yggdrasil node itself.
 	{
+		p := address.GetPrefix()
 		iprange := net.IPNet{
-			IP:   net.ParseIP("200::"),
+			IP:   net.IP(append([]byte{p[0] & 0xFE}, make([]byte, 15)...)),
 			Mask: net.CIDRMask(7, 128),
 		}
 		options := []core.SetupOption{

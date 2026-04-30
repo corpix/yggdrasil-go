@@ -8,46 +8,48 @@ import (
 )
 
 func TestAddress_Address_IsValid(t *testing.T) {
+	prefix := GetPrefix()
 	var address Address
 	_, _ = rand.Read(address[:])
 
-	address[0] = 0
-
+	// Wrong first byte — definitely not our prefix.
+	address[0] = ^prefix[0]
 	if address.IsValid() {
 		t.Fatal("invalid address marked as valid")
 	}
 
-	address[0] = 0x03
-
+	// Subnet prefix byte (low bit set) — valid subnet, invalid address.
+	address[0] = prefix[0] | 0x01
 	if address.IsValid() {
-		t.Fatal("invalid address marked as valid")
+		t.Fatal("subnet prefix byte should not be a valid address")
 	}
 
-	address[0] = 0x02
-
+	// Correct node prefix byte.
+	address[0] = prefix[0]
 	if !address.IsValid() {
 		t.Fatal("valid address marked as invalid")
 	}
 }
 
 func TestAddress_Subnet_IsValid(t *testing.T) {
+	prefix := GetPrefix()
 	var subnet Subnet
 	_, _ = rand.Read(subnet[:])
 
-	subnet[0] = 0
-
+	// Wrong first byte.
+	subnet[0] = ^prefix[0]
 	if subnet.IsValid() {
 		t.Fatal("invalid subnet marked as valid")
 	}
 
-	subnet[0] = 0x02
-
+	// Node prefix byte (low bit clear) — valid address, invalid subnet.
+	subnet[0] = prefix[0]
 	if subnet.IsValid() {
-		t.Fatal("invalid subnet marked as valid")
+		t.Fatal("node prefix byte should not be a valid subnet")
 	}
 
-	subnet[0] = 0x03
-
+	// Correct subnet prefix byte (low bit set).
+	subnet[0] = prefix[0] | 0x01
 	if !subnet.IsValid() {
 		t.Fatal("valid subnet marked as invalid")
 	}
@@ -110,5 +112,34 @@ func TestAddress_Subnet_GetKey(t *testing.T) {
 
 	if !bytes.Equal(subnet.GetKey(), expectedPublicKey) {
 		t.Fatal("invalid public key returned")
+	}
+}
+
+func TestSetPrefix(t *testing.T) {
+	original := GetPrefix()
+	defer func() { globalPrefix = original }()
+
+	// Odd prefix must be rejected.
+	if err := SetPrefix(0x03); err == nil {
+		t.Fatal("expected error for odd prefix byte")
+	}
+
+	// Even prefix must be accepted.
+	if err := SetPrefix(0x04); err != nil {
+		t.Fatalf("unexpected error for even prefix byte: %v", err)
+	}
+	if GetPrefix() != [1]byte{0x04} {
+		t.Fatal("prefix not updated")
+	}
+
+	// Addresses and subnets should reflect the new prefix.
+	pub, _, _ := ed25519.GenerateKey(nil)
+	addr := AddrForKey(pub)
+	if addr[0] != 0x04 {
+		t.Fatalf("address first byte: want 0x04, got 0x%02x", addr[0])
+	}
+	snet := SubnetForKey(pub)
+	if snet[0] != 0x05 {
+		t.Fatalf("subnet first byte: want 0x05, got 0x%02x", snet[0])
 	}
 }
