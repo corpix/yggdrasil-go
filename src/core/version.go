@@ -17,10 +17,12 @@ import (
 // It must always begin with the 4 bytes "meta" and a wire formatted uint64 major version number.
 // The current version also includes a minor version number, and the box/sig/link keys that need to be exchanged to open a connection.
 type version_metadata struct {
-	majorVer  uint16
-	minorVer  uint16
-	publicKey ed25519.PublicKey
-	priority  uint8
+	majorVer       uint16
+	minorVer       uint16
+	publicKey      ed25519.PublicKey
+	priority       uint8
+	features       uint64
+	communityProof []byte // 64-byte blake2b-512 HMAC; nil when FeatureCommunity is not set
 }
 
 const (
@@ -28,24 +30,35 @@ const (
 	ProtocolVersionMinor uint16 = 5
 )
 
+// Feature flags carried in the metaFeatures TLV field.
+const (
+	// FeatureCommunity indicates the node requires community string matching.
+	// Nodes without this flag or with a different community are rejected.
+	FeatureCommunity uint64 = 1 << 0
+)
+
 // Once a major/minor version is released, it is not safe to change any of these
 // (including their ordering), it is only safe to add new ones.
 const (
-	metaVersionMajor uint16 = iota // uint16
-	metaVersionMinor               // uint16
-	metaPublicKey                  // [32]byte
-	metaPriority                   // uint8
+	metaVersionMajor   uint16 = iota // uint16
+	metaVersionMinor                 // uint16
+	metaPublicKey                    // [32]byte
+	metaPriority                     // uint8
+	metaFeatures                     // uint64 — only emitted when non-zero; old nodes skip it
+	metaCommunityProof               // [64]byte blake2b-512(key=community)[pubkey]; old nodes skip it
 )
 
 type handshakeError string
 
 func (e handshakeError) Error() string { return string(e) }
 
-const ErrHandshakeInvalidPreamble = handshakeError("invalid handshake, remote side is not Yggdrasil")
-const ErrHandshakeInvalidLength = handshakeError("invalid handshake length, possible version mismatch")
-const ErrHandshakeInvalidPassword = handshakeError("invalid password supplied, check your config")
-const ErrHandshakeHashFailure = handshakeError("invalid hash length")
+const ErrHandshakeInvalidPreamble   = handshakeError("invalid handshake, remote side is not Yggdrasil")
+const ErrHandshakeInvalidLength     = handshakeError("invalid handshake length, possible version mismatch")
+const ErrHandshakeInvalidPassword   = handshakeError("invalid password supplied, check your config")
+const ErrHandshakeHashFailure       = handshakeError("invalid hash length")
 const ErrHandshakeIncorrectPassword = handshakeError("password does not match remote side")
+const ErrHandshakeCommunityRequired = handshakeError("remote node does not support the community feature")
+const ErrHandshakeCommunityMismatch = handshakeError("community string does not match remote node")
 
 // Gets a base metadata with no keys set, but with the correct version numbers.
 func version_getBaseMetadata() version_metadata {
@@ -55,11 +68,33 @@ func version_getBaseMetadata() version_metadata {
 	}
 }
 
+// newCommunityProof computes the community handshake proof for a public key.
+// The proof is blake2b-512 keyed with the community string over the public key.
+// It proves knowledge of the community string without revealing it.
+func newCommunityProof(community []byte, pubkey ed25519.PublicKey) ([]byte, error) {
+	hasher, err := blake2b.New512(community)
+	if err != nil {
+		return nil, err
+	}
+	hasher.Write(pubkey)
+	return hasher.Sum(nil), nil
+}
+
+// verifyCommunityProof checks that proof was produced by a node with the given
+// community string for the given public key.
+func verifyCommunityProof(community, proof []byte, pubkey ed25519.PublicKey) bool {
+	expected, err := newCommunityProof(community, pubkey)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(expected, proof)
+}
+
 // Encodes version metadata into its wire format.
 func (m *version_metadata) encode(privateKey ed25519.PrivateKey, password []byte) ([]byte, error) {
 	bs := make([]byte, 0, 64)
 	bs = append(bs, 'm', 'e', 't', 'a')
-	bs = append(bs, 0, 0) // Remaining message length
+	bs = append(bs, 0, 0) // Remaining message length placeholder
 
 	bs = binary.BigEndian.AppendUint16(bs, metaVersionMajor)
 	bs = binary.BigEndian.AppendUint16(bs, 2)
@@ -77,15 +112,23 @@ func (m *version_metadata) encode(privateKey ed25519.PrivateKey, password []byte
 	bs = binary.BigEndian.AppendUint16(bs, 1)
 	bs = append(bs, m.priority)
 
+	if m.features != 0 {
+		bs = binary.BigEndian.AppendUint16(bs, metaFeatures)
+		bs = binary.BigEndian.AppendUint16(bs, 8)
+		bs = binary.BigEndian.AppendUint64(bs, m.features)
+	}
+
+	if len(m.communityProof) > 0 {
+		bs = binary.BigEndian.AppendUint16(bs, metaCommunityProof)
+		bs = binary.BigEndian.AppendUint16(bs, uint16(len(m.communityProof)))
+		bs = append(bs, m.communityProof...)
+	}
+
 	hasher, err := blake2b.New512(password)
 	if err != nil {
-		return nil, err
+		return nil, ErrHandshakeInvalidPassword
 	}
-	n, err := hasher.Write(m.publicKey)
-	if err != nil {
-		return nil, err
-	}
-	if n != ed25519.PublicKeySize {
+	if n, err := hasher.Write(m.publicKey); err != nil || n != ed25519.PublicKeySize {
 		return nil, ErrHandshakeHashFailure
 	}
 	hash := hasher.Sum(nil)
@@ -95,25 +138,26 @@ func (m *version_metadata) encode(privateKey ed25519.PrivateKey, password []byte
 	return bs, nil
 }
 
-// Decodes version metadata from its wire format into the struct.
-func (m *version_metadata) decode(r io.Reader, password []byte) error {
+// decodeTLV reads and parses the TLV fields from the wire without verifying
+// the trailing signature. Returns the raw signature bytes for the caller to
+// verify after inspecting the decoded fields (e.g. feature flags).
+func (m *version_metadata) decodeTLV(r io.Reader) (sig []byte, err error) {
 	bh := [6]byte{}
 	if _, err := io.ReadFull(r, bh[:]); err != nil {
-		return err
+		return nil, err
 	}
-	meta := [4]byte{'m', 'e', 't', 'a'}
-	if !bytes.Equal(bh[:4], meta[:]) {
-		return ErrHandshakeInvalidPreamble
+	if !bytes.Equal(bh[:4], []byte("meta")) {
+		return nil, ErrHandshakeInvalidPreamble
 	}
 	hl := binary.BigEndian.Uint16(bh[4:6])
 	if hl < ed25519.SignatureSize {
-		return ErrHandshakeInvalidLength
+		return nil, ErrHandshakeInvalidLength
 	}
 	bs := make([]byte, hl)
 	if _, err := io.ReadFull(r, bs); err != nil {
-		return err
+		return nil, err
 	}
-	sig := bs[len(bs)-ed25519.SignatureSize:]
+	sig = append([]byte(nil), bs[len(bs)-ed25519.SignatureSize:]...)
 	bs = bs[:len(bs)-ed25519.SignatureSize]
 
 	for len(bs) >= 4 {
@@ -125,26 +169,33 @@ func (m *version_metadata) decode(r io.Reader, password []byte) error {
 		switch op {
 		case metaVersionMajor:
 			m.majorVer = binary.BigEndian.Uint16(bs[:2])
-
 		case metaVersionMinor:
 			m.minorVer = binary.BigEndian.Uint16(bs[:2])
-
 		case metaPublicKey:
 			m.publicKey = make(ed25519.PublicKey, ed25519.PublicKeySize)
 			copy(m.publicKey, bs[:ed25519.PublicKeySize])
-
 		case metaPriority:
 			m.priority = bs[0]
+		case metaFeatures:
+			if oplen >= 8 {
+				m.features = binary.BigEndian.Uint64(bs[:8])
+			}
+		case metaCommunityProof:
+			m.communityProof = append([]byte(nil), bs[:oplen]...)
 		}
 		bs = bs[oplen:]
 	}
+	return sig, nil
+}
 
+// verifySignature authenticates the handshake using the provided password.
+// Must be called after decodeTLV so that m.publicKey is populated.
+func (m *version_metadata) verifySignature(sig, password []byte) error {
 	hasher, err := blake2b.New512(password)
 	if err != nil {
 		return ErrHandshakeInvalidPassword
 	}
-	n, err := hasher.Write(m.publicKey)
-	if err != nil || n != ed25519.PublicKeySize {
+	if n, err := hasher.Write(m.publicKey); err != nil || n != ed25519.PublicKeySize {
 		return ErrHandshakeHashFailure
 	}
 	hash := hasher.Sum(nil)
@@ -154,7 +205,18 @@ func (m *version_metadata) decode(r io.Reader, password []byte) error {
 	return nil
 }
 
-// Checks that the "meta" bytes and the version numbers are the expected values.
+// decode is the combined convenience method for callers that do not need to
+// inspect feature flags before signature verification (e.g. multicast).
+func (m *version_metadata) decode(r io.Reader, password []byte) error {
+	sig, err := m.decodeTLV(r)
+	if err != nil {
+		return err
+	}
+	return m.verifySignature(sig, password)
+}
+
+// check validates that the version numbers and public key are well-formed and
+// match the expected protocol version.
 func (m *version_metadata) check() bool {
 	switch {
 	case m.majorVer != ProtocolVersionMajor:

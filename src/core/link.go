@@ -654,9 +654,19 @@ func (l *links) dialerFor(u *url.URL) (linkProtocol, error) {
 }
 
 func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, success func(), local bool) error {
+	community := l.core.config.community
+
 	meta := version_getBaseMetadata()
 	meta.publicKey = l.core.public
 	meta.priority = options.priority
+	if len(community) > 0 {
+		meta.features |= FeatureCommunity
+		proof, err := newCommunityProof(community, l.core.public)
+		if err != nil {
+			return fmt.Errorf("failed to compute community proof: %w", err)
+		}
+		meta.communityProof = proof
+	}
 	metaBytes, err := meta.encode(l.core.secret, options.password)
 	if err != nil {
 		return fmt.Errorf("failed to generate handshake: %w", err)
@@ -674,7 +684,24 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 	}
 	meta = version_metadata{}
 	base := version_getBaseMetadata()
-	if err := meta.decode(conn, options.password); err != nil {
+	sig, err := meta.decodeTLV(conn)
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	if len(community) > 0 {
+		// We require community: remote must advertise FeatureCommunity and
+		// carry a proof that matches our community string.
+		if meta.features&FeatureCommunity == 0 {
+			_ = conn.Close()
+			return ErrHandshakeCommunityRequired
+		}
+		if !verifyCommunityProof(community, meta.communityProof, meta.publicKey) {
+			_ = conn.Close()
+			return ErrHandshakeCommunityMismatch
+		}
+	}
+	if err := meta.verifySignature(sig, options.password); err != nil {
 		_ = conn.Close()
 		return err
 	}

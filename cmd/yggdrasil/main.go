@@ -238,6 +238,9 @@ func main() {
 			}
 			options = append(options, core.AllowedPublicKey(k[:]))
 		}
+		if cfg.Community != "" {
+			options = append(options, core.Community([]byte(cfg.Community)))
+		}
 		if n.core, err = core.New(cfg.Certificate, logger, options...); err != nil {
 			panic(err)
 		}

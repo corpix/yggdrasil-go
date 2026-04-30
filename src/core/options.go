@@ -37,6 +37,8 @@ func (c *Core) _applyOption(opt SetupOption) (err error) {
 		c.config._allowedPublicKeys[pk] = struct{}{}
 	case OutboundSNIList:
 		c.config.outboundSNIList = append([]string(nil), v...)
+	case Community:
+		c.config.community = append([]byte(nil), v...)
 	}
 	return
 }
@@ -55,6 +57,7 @@ type NodeInfoPrivacy bool
 type AllowedPublicKey ed25519.PublicKey
 type PeerFilter func(net.IP) bool
 type OutboundSNIList []string
+type Community []byte
 
 func (a ListenAddress) isSetupOption()    {}
 func (a Peer) isSetupOption()             {}
@@ -63,3 +66,4 @@ func (a NodeInfoPrivacy) isSetupOption()  {}
 func (a AllowedPublicKey) isSetupOption() {}
 func (a PeerFilter) isSetupOption()       {}
 func (a OutboundSNIList) isSetupOption()  {}
+func (a Community) isSetupOption()        {}
