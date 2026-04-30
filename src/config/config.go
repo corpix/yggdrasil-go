@@ -55,6 +55,8 @@ type NodeConfig struct {
 	LogLookups          bool                       `json:",omitempty"`
 	NodeInfoPrivacy     bool                       `comment:"By default, nodeinfo contains some defaults including the platform,\narchitecture and Yggdrasil version. These can help when surveying\nthe network and diagnosing network routing problems. Enabling\nnodeinfo privacy prevents this, so that only items specified in\n\"NodeInfo\" are sent back if specified."`
 	NodeInfo            map[string]interface{}     `comment:"Optional nodeinfo. This must be a { \"key\": \"value\", ... } map\nor set as null. This is entirely optional but, if set, is visible\nto the whole network on request."`
+	PrometheusEnabled   bool                       `json:",omitempty" comment:"Enable the built-in Prometheus metrics endpoint. Disabled by default."`
+	PrometheusListen    string                     `json:",omitempty" comment:"Listen address for the Prometheus metrics HTTP endpoint.\nDefaults to 127.0.0.1:9756 when PrometheusEnabled is true."`
 }
 
 type MulticastInterfaceConfig struct {
@@ -85,6 +87,8 @@ func GenerateConfig() *NodeConfig {
 	cfg.IfName = defaults.DefaultIfName
 	cfg.IfMTU = defaults.DefaultIfMTU
 	cfg.NodeInfoPrivacy = false
+	cfg.PrometheusEnabled = false
+	cfg.PrometheusListen = "127.0.0.1:9756"
 	if err := cfg.postprocessConfig(); err != nil {
 		panic(err)
 	}

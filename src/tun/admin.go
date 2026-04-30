@@ -27,6 +27,12 @@ func (t *TunAdapter) getTUNHandler(req *GetTUNRequest, res *GetTUNResponse) erro
 	return nil
 }
 
+func (t *TunAdapter) GetTUN() GetTUNResponse {
+	var res GetTUNResponse
+	_ = t.getTUNHandler(&GetTUNRequest{}, &res)
+	return res
+}
+
 func (t *TunAdapter) SetupAdminHandlers(a *admin.AdminSocket) {
 	_ = a.AddHandler(
 		"getTun", "Show information about the node's TUN interface", []string{},

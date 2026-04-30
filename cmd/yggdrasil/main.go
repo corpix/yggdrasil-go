@@ -25,6 +25,7 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 	"github.com/yggdrasil-network/yggdrasil-go/src/ipv6rwc"
+	"github.com/yggdrasil-network/yggdrasil-go/src/metrics"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -37,6 +38,7 @@ type node struct {
 	tun       *tun.TunAdapter
 	multicast *multicast.Multicast
 	admin     *admin.AdminSocket
+	metrics   *metrics.Metrics
 }
 
 // The main function is responsible for configuring and starting Yggdrasil.
@@ -283,6 +285,13 @@ func main() {
 		}
 	}
 
+	// Set up Prometheus metrics endpoint.
+	if cfg.PrometheusEnabled {
+		if n.metrics, err = metrics.New(n.core, n.tun, n.multicast, logger, cfg.PrometheusListen); err != nil {
+			panic(err)
+		}
+	}
+
 	//Windows service shutdown
 	minwinsvc.SetOnExit(func() {
 		logger.Infof("Shutting down service ...")
@@ -318,6 +327,9 @@ func main() {
 	<-ctx.Done()
 
 	// Shut down the node.
+	if n.metrics != nil {
+		_ = n.metrics.Stop()
+	}
 	_ = n.admin.Stop()
 	_ = n.multicast.Stop()
 	_ = n.tun.Stop()

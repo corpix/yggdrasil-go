@@ -46,6 +46,12 @@ func (m *Multicast) getMulticastInterfacesHandler(_ *GetMulticastInterfacesReque
 	return nil
 }
 
+func (m *Multicast) GetMulticastInterfaces() GetMulticastInterfacesResponse {
+	var res GetMulticastInterfacesResponse
+	_ = m.getMulticastInterfacesHandler(&GetMulticastInterfacesRequest{}, &res)
+	return res
+}
+
 func (m *Multicast) SetupAdminHandlers(a *admin.AdminSocket) {
 	_ = a.AddHandler(
 		"getMulticastInterfaces", "Show which interfaces multicast is enabled on", []string{},
