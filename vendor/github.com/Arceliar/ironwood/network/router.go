@@ -38,6 +38,24 @@ Potential showstopping issue (long term):
 
 const routerUnknownLatency = time.Duration(^uint32(0))
 
+const (
+	penaltyHalfLife         = 5 * time.Minute
+	minDisconnectPenalty    = 200 * time.Millisecond
+	minLossPenalty          = 50 * time.Millisecond
+	maxPenalty              = 30 * time.Second
+	penaltyCleanupThreshold = time.Millisecond
+)
+
+type routerPenaltyEntry struct {
+	penaltyMs  int64
+	recordedAt time.Time
+}
+
+type routerPenaltyKey struct {
+	key      publicKey
+	protocol string
+}
+
 type router struct {
 	phony.Inbox
 	core       *core
@@ -48,9 +66,10 @@ type router struct {
 	ports      map[peerPort]publicKey               // used in tree lookups
 	infos      map[publicKey]routerInfo
 	timers     map[publicKey]*time.Timer
-	ancs       map[publicKey][]publicKey // Peer ancestry info
-	cache      map[publicKey][]peerPort  // Cache path slice for each peer
-	lags       map[*peer]time.Duration   // Latency for a given *peer to respond with a valid sigres, exponentially weighted average
+	ancs       map[publicKey][]publicKey               // Peer ancestry info
+	cache      map[publicKey][]peerPort                // Cache path slice for each peer
+	lags       map[*peer]time.Duration                 // Latency for a given *peer to respond with a valid sigres, exponentially weighted average
+	penalties  map[routerPenaltyKey]routerPenaltyEntry // Per-key+protocol disconnect/loss penalty, survives reconnects
 	requests   map[publicKey]routerSigReq
 	responses  map[publicKey]routerSigRes
 	responded  map[*peer]struct{}
@@ -74,6 +93,7 @@ func (r *router) init(c *core) {
 	r.ancs = make(map[publicKey][]publicKey)
 	r.cache = make(map[publicKey][]peerPort)
 	r.lags = make(map[*peer]time.Duration)
+	r.penalties = make(map[routerPenaltyKey]routerPenaltyEntry)
 	r.requests = make(map[publicKey]routerSigReq)
 	r.responses = make(map[publicKey]routerSigRes)
 	r.responded = make(map[*peer]struct{})
@@ -149,6 +169,7 @@ func (r *router) removePeer(from phony.Actor, p *peer) {
 		//r._resetCache()
 		ps := r.peers[p.key]
 		delete(ps, p)
+		r._recordDisconnect(p)
 		delete(r.lags, p)
 		delete(r.responded, p)
 		if len(ps) == 0 {
@@ -186,6 +207,7 @@ func (r *router) _clearReqs() {
 }
 
 func (r *router) _sendReqs() {
+	r._penalizeMissedResponses()
 	r._clearReqs()
 	for pk, ps := range r.peers {
 		req := r._newReq()
@@ -220,11 +242,112 @@ func (r *router) _updateAncestries() {
 
 func (r *router) _getCost(p *peer) uint64 {
 	// Note that cost needs to be non-zero, used in multiplication and division
-	c := uint64(r.lags[p].Milliseconds())
+	lag := r.lags[p].Milliseconds()
+	penalty := r._getDecayedPenalty(r._penaltyKeyForPeer(p))
+	c := uint64(lag + penalty)
 	if c == 0 {
 		c = 1
 	}
 	return c
+}
+
+func (r *router) _penaltyKeyForPeer(p *peer) routerPenaltyKey {
+	return routerPenaltyKey{
+		key:      p.key,
+		protocol: p.protocol,
+	}
+}
+
+func (r *router) _addPenalty(key routerPenaltyKey, component int64) {
+	if component <= 0 {
+		return
+	}
+	existing := r._getDecayedPenalty(key)
+	total := existing + component
+	if total > maxPenalty.Milliseconds() {
+		total = maxPenalty.Milliseconds()
+	}
+	r.penalties[key] = routerPenaltyEntry{
+		penaltyMs:  total,
+		recordedAt: time.Now(),
+	}
+}
+
+// _getDecayedPenalty returns the current penalty for the key in milliseconds,
+// applying exponential decay (half-life = penaltyHalfLife) since last recorded.
+// Stale entries below penaltyCleanupThreshold are deleted as a side effect.
+// Caller must hold the router actor lock.
+func (r *router) _getDecayedPenalty(key routerPenaltyKey) int64 {
+	entry, isIn := r.penalties[key]
+	if !isIn {
+		return 0
+	}
+	elapsed := time.Since(entry.recordedAt)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	halfLifeMs := penaltyHalfLife.Milliseconds()
+	elapsedMs := elapsed.Milliseconds()
+	penaltyMs := entry.penaltyMs
+
+	// Apply full halvings via right-shift
+	shifts := elapsedMs / halfLifeMs
+	if shifts >= 63 {
+		delete(r.penalties, key)
+		return 0
+	}
+	penaltyMs >>= shifts
+
+	// Linear interpolation for the fractional half-life remainder
+	fracMs := elapsedMs % halfLifeMs
+	twoHL := int64(2) * halfLifeMs
+	penaltyMs = penaltyMs * (twoHL - fracMs) / twoHL
+
+	if penaltyMs < penaltyCleanupThreshold.Milliseconds() {
+		delete(r.penalties, key)
+		return 0
+	}
+	return penaltyMs
+}
+
+// _recordDisconnect accumulates a disconnect penalty for the peer's key+protocol.
+// It is a no-op if the peer never completed a SigReq/SigRes exchange.
+// Caller must hold the router actor lock.
+func (r *router) _recordDisconnect(p *peer) {
+	lag, isIn := r.lags[p]
+	if !isIn || lag == routerUnknownLatency {
+		return
+	}
+	component := max(minDisconnectPenalty.Milliseconds(), lag.Milliseconds())
+	r._addPenalty(r._penaltyKeyForPeer(p), component)
+}
+
+// _penalizeMissedResponses increases the lag estimate for peers that did not
+// respond to the previous SigReq round, serving as a packet-loss signal.
+// Must be called before _clearReqs() wipes r.requests and r.responded.
+// Caller must hold the router actor lock.
+func (r *router) _penalizeMissedResponses() {
+	for pk, ps := range r.peers {
+		if _, hadReq := r.requests[pk]; !hadReq {
+			continue
+		}
+		for p := range ps {
+			if _, responded := r.responded[p]; responded {
+				continue
+			}
+			lag := r.lags[p]
+			if lag == routerUnknownLatency {
+				continue
+			}
+			increased := lag + lag/8
+			if increased > routerUnknownLatency {
+				increased = routerUnknownLatency
+			}
+			component := max(minLossPenalty.Milliseconds(), (increased - lag).Milliseconds())
+			r._addPenalty(r._penaltyKeyForPeer(p), component)
+			r.lags[p] = increased
+		}
+	}
 }
 
 func (r *router) _fix() {

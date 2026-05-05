@@ -26,10 +26,26 @@ type peers struct {
 	order       uint64 // global counter for (*peer).order
 }
 
+type protocolConn interface {
+	Protocol() string
+}
+
 func (ps *peers) init(c *core) {
 	ps.core = c
 	ps.ports = make(map[peerPort]struct{})
 	ps.peers = make(map[publicKey]map[*peer]struct{})
+}
+
+func peerProtocolFromConn(conn net.Conn) string {
+	if conn == nil {
+		return "UNKNOWN"
+	}
+	if pc, ok := conn.(protocolConn); ok {
+		if protocol := pc.Protocol(); protocol != "" {
+			return protocol
+		}
+	}
+	return "UNKNOWN"
 }
 
 func (ps *peers) addPeer(key publicKey, conn net.Conn, prio uint8) (*peer, error) {
@@ -66,6 +82,7 @@ func (ps *peers) addPeer(key publicKey, conn net.Conn, prio uint8) (*peer, error
 		p.conn = conn
 		p.done = make(chan struct{})
 		p.key = key
+		p.protocol = peerProtocolFromConn(conn)
 		p.port = port
 		p.prio = prio
 		p.monitor.peer = p
@@ -102,6 +119,7 @@ type peer struct {
 	conn        net.Conn
 	done        chan struct{}
 	key         publicKey
+	protocol    string
 	port        peerPort
 	prio        uint8
 	queue       packetQueue

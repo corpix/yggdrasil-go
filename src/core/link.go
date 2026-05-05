@@ -369,8 +369,9 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 				// bytes written to and read from this connection without
 				// the help of ironwood.
 				lc := &linkConn{
-					Conn: conn,
-					up:   time.Now(),
+					Conn:     conn,
+					up:       time.Now(),
+					protocol: state.linkProto,
 				}
 
 				// Update the link state with our newly wrapped connection.
@@ -568,8 +569,9 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 					// bytes written to and read from this connection without
 					// the help of ironwood.
 					lc = &linkConn{
-						Conn: conn,
-						up:   time.Now(),
+						Conn:     conn,
+						up:       time.Now(),
+						protocol: state.linkProto,
 					}
 
 					// Update the link state with our newly wrapped connection.
@@ -854,14 +856,19 @@ func (l *links) stickySNI(u *url.URL, keyIDs []string) string {
 type linkConn struct {
 	// tx and rx are at the beginning of the struct to ensure 64-bit alignment
 	// on 32-bit platforms, see https://pkg.go.dev/sync/atomic#pkg-note-BUG
-	rx     uint64
-	tx     uint64
-	rxrate uint64
-	txrate uint64
-	lastrx uint64
-	lasttx uint64
-	up     time.Time
+	rx       uint64
+	tx       uint64
+	rxrate   uint64
+	txrate   uint64
+	lastrx   uint64
+	lasttx   uint64
+	up       time.Time
+	protocol string
 	net.Conn
+}
+
+func (c *linkConn) Protocol() string {
+	return c.protocol
 }
 
 func (c *linkConn) Read(p []byte) (n int, err error) {
