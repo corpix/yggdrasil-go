@@ -32,7 +32,6 @@ type DebugPeerInfo struct {
 	Updated  time.Time
 	Conn     net.Conn
 	Latency  time.Duration
-	Penalty  time.Duration
 }
 
 type DebugTreeInfo struct {
@@ -69,12 +68,9 @@ func (d *Debug) GetSelf() (info DebugSelfInfo) {
 
 func (d *Debug) GetPeers() (infos []DebugPeerInfo) {
 	costs := map[*peer]uint64{}
-	penalties := map[*peer]time.Duration{}
 	phony.Block(&d.c.router, func() {
 		for p := range d.c.router.lags {
 			costs[p] = d.c.router._getCost(p)
-			penaltyMs := d.c.router._getDecayedPenalty(p.key)
-			penalties[p] = time.Duration(penaltyMs) * time.Millisecond
 		}
 	})
 	phony.Block(&d.c.peers, func() {
@@ -89,7 +85,6 @@ func (d *Debug) GetPeers() (infos []DebugPeerInfo) {
 				if rtt := peer.srrt.Sub(peer.srst).Round(time.Millisecond / 100); rtt > 0 {
 					info.Latency = rtt
 				}
-				info.Penalty = penalties[peer]
 				infos = append(infos, info)
 			}
 		}

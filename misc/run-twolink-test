@@ -11,15 +11,24 @@ set -e
 conf1="${1:-}"
 conf2="${2:-}"
 
+WAN_IF="${WAN_IF:-$(ip -4 route get 1.1.1.1 | awk '{for (i=1;i<=NF;i++) if ($i=="dev") {print $(i+1); exit}}')}"
+
 cleanup() {
+  iptables -t nat -D POSTROUTING -s 10.201.254.0/29 -o "$WAN_IF" -j MASQUERADE 2>/dev/null || true
+  iptables -D FORWARD -s 10.201.254.0/29 -o "$WAN_IF" -j ACCEPT 2>/dev/null || true
+  iptables -D FORWARD -d 10.201.254.0/29 -i "$WAN_IF" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+
+  ip link delete node1wan 2>/dev/null || true
+  ip link delete node2wan 2>/dev/null || true
+
   ip link delete veth11 2>/dev/null || true
   ip link delete veth12 2>/dev/null || true
+
   ip netns delete node1 2>/dev/null || true
   ip netns delete node2 2>/dev/null || true
 }
 
 trap cleanup EXIT
-
 
 make_config() {
   local src="$1"
@@ -43,6 +52,29 @@ make_config() {
 ip netns add node1
 ip netns add node2
 
+ip netns exec node1 ip link set lo up
+ip netns exec node2 ip link set lo up
+
+ip link add node1wan type veth peer name wan1
+ip link set wan1 netns node1
+ip addr add 10.201.254.1/30 dev node1wan
+ip link set node1wan up
+ip netns exec node1 ip addr add 10.201.254.2/30 dev wan1
+ip netns exec node1 ip link set wan1 up
+ip netns exec node1 ip route add default via 10.201.254.1
+
+ip link add node2wan type veth peer name wan2
+ip link set wan2 netns node2
+ip addr add 10.201.254.5/30 dev node2wan
+ip link set node2wan up
+ip netns exec node2 ip addr add 10.201.254.6/30 dev wan2
+ip netns exec node2 ip link set wan2 up
+ip netns exec node2 ip route add default via 10.201.254.5
+
+iptables -t nat -A POSTROUTING -s 10.201.254.0/29 -o "$WAN_IF" -j MASQUERADE
+iptables -A FORWARD -s 10.201.254.0/29 -o "$WAN_IF" -j ACCEPT
+iptables -A FORWARD -d 10.201.254.0/29 -i "$WAN_IF" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
 ip link add veth11 type veth peer name veth21
 ip link set veth11 netns node1 up
 ip link set veth21 netns node2 up
@@ -51,6 +83,11 @@ ip link add veth12 type veth peer name veth22
 ip link set veth12 netns node1 up
 ip link set veth22 netns node2 up
 
+ip netns exec node1 ip addr add 10.201.1.1/30 dev veth11
+ip netns exec node2 ip addr add 10.201.1.2/30 dev veth21
+ip netns exec node1 ip addr add 10.201.2.1/30 dev veth12
+ip netns exec node2 ip addr add 10.201.2.2/30 dev veth22
+
 ip netns exec node1 tc qdisc add dev veth11 root tbf rate 10mbit burst 8192 latency 1ms
 ip netns exec node2 tc qdisc add dev veth21 root tbf rate 10mbit burst 8192 latency 1ms
 
@@ -58,16 +95,16 @@ ip netns exec node1 tc qdisc add dev veth12 root tbf rate 100mbit burst 8192 lat
 ip netns exec node2 tc qdisc add dev veth22 root tbf rate 100mbit burst 8192 latency 1ms
 
 ip netns exec node1 env PPROFLISTEN=localhost:6060 ./yggdrasil \
-   -loglevel debug \
+   -loglevel trace \
    -useconffile <(make_config "$conf1" "unix://node1.sock") \
    &> node1.log &
+
 ip netns exec node2 env PPROFLISTEN=localhost:6060 ./yggdrasil \
-   -loglevel debug \
+   -loglevel trace \
    -useconffile <(make_config "$conf2" "unix://node2.sock") \
    &> node2.log &
 
 echo "Started, to continue you should:"
 echo -e "\tsudo kill" $(jobs -p)
-wait
 
-cleanup
+wait

@@ -20,15 +20,15 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1755938397,
-        "narHash": "sha256-ABIRuHdg7mkk+FDEAY2izkm0fVJenzOAP3KH5XeXxwY=",
-        "rev": "622810a18e0e8f97f09043f37a388397fa7461f2",
+        "lastModified": 1777516428,
+        "narHash": "sha256-z1oNb70s16uIQA9MCHnYEG0z/J39PHoQi75yJ4Lk/I0=",
+        "rev": "37fc5fd82459ded683a9adbd273c400880b2b724",
         "type": "tarball",
-        "url": "https://git.tatikoma.dev/api/v1/repos/corpix/nixpkgs/archive/622810a18e0e8f97f09043f37a388397fa7461f2.tar.gz"
+        "url": "https://git.tatikoma.dev/api/v1/repos/corpix/nixpkgs/archive/37fc5fd82459ded683a9adbd273c400880b2b724.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://git.tatikoma.dev/corpix/nixpkgs/archive/v2025-08-23.848070.tar.gz"
+        "url": "https://git.tatikoma.dev/corpix/nixpkgs/archive/corpix.tar.gz"
       }
     },
     "root": {
