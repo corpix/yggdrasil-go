@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"reflect"
+	"strings"
 	"testing"
+
+	"golang.org/x/crypto/blake2b"
 )
 
 func TestVersionPasswordAuth(t *testing.T) {
@@ -74,5 +77,84 @@ func TestVersionRoundtrip(t *testing.T) {
 				t.Fatalf("round-trip failed\nwant: %+v\n got: %+v", test, decoded)
 			}
 		}
+	}
+}
+
+func TestCommunityProofCompatibilityForShortCommunities(t *testing.T) {
+	pubkey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, community := range [][]byte{
+		[]byte("community"),
+		bytes.Repeat([]byte("a"), blake2b.Size),
+	} {
+		proof, err := newCommunityProof(community, pubkey)
+		if err != nil {
+			t.Fatalf("newCommunityProof failed for len=%d: %v", len(community), err)
+		}
+
+		hasher, err := blake2b.New512(community)
+		if err != nil {
+			t.Fatalf("legacy blake2b.New512 failed for len=%d: %v", len(community), err)
+		}
+		if _, err := hasher.Write(pubkey); err != nil {
+			t.Fatalf("legacy proof write failed for len=%d: %v", len(community), err)
+		}
+		expected := hasher.Sum(nil)
+
+		if !bytes.Equal(proof, expected) {
+			t.Fatalf("proof changed for short community len=%d", len(community))
+		}
+	}
+}
+
+func TestCommunityProofAcceptsLongCommunities(t *testing.T) {
+	pubkey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	longCommunity := []byte("type:sha256(" + strings.Repeat("0123456789abcdef", 5) + ")")
+	if len(longCommunity) <= blake2b.Size {
+		t.Fatalf("test community must be longer than %d bytes", blake2b.Size)
+	}
+
+	proof, err := newCommunityProof(longCommunity, pubkey)
+	if err != nil {
+		t.Fatalf("newCommunityProof failed: %v", err)
+	}
+	if len(proof) != blake2b.Size {
+		t.Fatalf("unexpected proof length: got %d want %d", len(proof), blake2b.Size)
+	}
+	if !verifyCommunityProof(longCommunity, proof, pubkey) {
+		t.Fatal("proof did not verify with matching long community")
+	}
+}
+
+func TestCommunityProofRejectsDifferentCommunities(t *testing.T) {
+	pubkey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shortCommunity := []byte("community-a")
+	shortProof, err := newCommunityProof(shortCommunity, pubkey)
+	if err != nil {
+		t.Fatalf("newCommunityProof failed for short community: %v", err)
+	}
+	if verifyCommunityProof([]byte("community-b"), shortProof, pubkey) {
+		t.Fatal("short community proof verified with different community")
+	}
+
+	longCommunityA := []byte("type:sha256(" + strings.Repeat("a", 80) + ")")
+	longCommunityB := []byte("type:sha256(" + strings.Repeat("b", 80) + ")")
+	longProof, err := newCommunityProof(longCommunityA, pubkey)
+	if err != nil {
+		t.Fatalf("newCommunityProof failed for long community: %v", err)
+	}
+	if verifyCommunityProof(longCommunityB, longProof, pubkey) {
+		t.Fatal("long community proof verified with different community")
 	}
 }

@@ -36,13 +36,13 @@ const minimumBackoffLimit = time.Second * 5
 type links struct {
 	phony.Inbox
 	core        *Core
-	tcp         *linkTCP        // TCP interface support
-	tls         *linkTLS        // TLS interface support
-	unix        *linkUNIX       // UNIX interface support
-	socks       *linkSOCKS      // SOCKS interface support
-	quic        *linkQUIC       // QUIC interface support
-	ws          *linkWS         // WS interface support
-	wss         *linkWSS        // WSS interface support
+	tcp         *linkTCP         // TCP interface support
+	tls         *linkTLS         // TLS interface support
+	unix        *linkUNIX        // UNIX interface support
+	socks       *linkSOCKS       // SOCKS interface support
+	quic        *linkQUIC        // QUIC interface support
+	ws          *linkWS          // WS interface support
+	wss         *linkWSS         // WSS interface support
 	xrayReality *linkXrayReality // REALITY/uTLS over raw TCP
 	// _links can only be modified safely from within the links actor
 	_links     map[linkInfo]*link // *link is nil if connection in progress
@@ -62,12 +62,13 @@ type linkInfo struct {
 
 // link tracks the state of a connection, either persistent or non-persistent
 type link struct {
-	ctx       context.Context    // Connection context
-	cancel    context.CancelFunc // Stop future redial attempts (when peer removed)
-	kick      chan struct{}      // Attempt to reconnect now, if backing off
-	linkType  linkType           // Type of link, i.e. outbound/inbound, persistent/ephemeral
-	linkProto string             // Protocol carrier of link, e.g. TCP, AWDL
-	sni       string             // Last observed/used SNI for this link
+	ctx             context.Context    // Connection context
+	cancel          context.CancelFunc // Stop future redial attempts (when peer removed)
+	kick            chan struct{}      // Attempt to reconnect now, if backing off
+	linkType        linkType           // Type of link, i.e. outbound/inbound, persistent/ephemeral
+	linkProto       string             // Protocol carrier of link, e.g. TCP, AWDL
+	sni             string             // Last observed/used SNI for this link
+	communityStatus string             // Last established community classification for this link
 	// The remaining fields can only be modified safely from within the links actor
 	_conn    *linkConn // Connected link, if any, nil if not connected
 	_err     error     // Last error on the connection, if any
@@ -393,7 +394,7 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 
 				// Give the connection to the handler. The handler will block
 				// for the lifetime of the connection.
-				switch err = l.handler(linkType, options, lc, resetBackoff, false); {
+				switch err = l.handler(state, linkType, options, lc, resetBackoff, false); {
 				case errors.Is(err, ErrLinkToSelf):
 					// This is a pretty permanent error, don't retry.
 					backoff = -1
@@ -410,6 +411,7 @@ func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 				_ = lc.Close()
 				phony.Block(l, func() {
 					state._conn = nil
+					state.communityStatus = ""
 					if err == nil {
 						err = fmt.Errorf("remote side closed the connection")
 					}
@@ -578,6 +580,7 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 					// Clear the error state.
 					state._conn = lc
 					state.sni = ""
+					state.communityStatus = ""
 					state._err = nil
 					state._errtime = time.Time{}
 
@@ -602,7 +605,7 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 						state.sni = sni
 					})
 				}
-				switch err = l.handler(linkTypeIncoming, optionsLocal, lc, nil, local); {
+				switch err = l.handler(state, linkTypeIncoming, optionsLocal, lc, nil, local); {
 				case err == nil:
 				case errors.Is(err, io.EOF):
 				case errors.Is(err, net.ErrClosed):
@@ -653,8 +656,10 @@ func (l *links) dialerFor(u *url.URL) (linkProtocol, error) {
 	return dialer, nil
 }
 
-func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, success func(), local bool) error {
+func (l *links) handler(state *link, linkType linkType, options linkOptions, conn net.Conn, success func(), local bool) error {
 	community := l.core.config.community
+	communityMode := l.core.config.communityMode
+	communityStatus := "off"
 
 	meta := version_getBaseMetadata()
 	meta.publicKey = l.core.public
@@ -690,15 +695,19 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 		return err
 	}
 	if len(community) > 0 {
-		// We require community: remote must advertise FeatureCommunity and
-		// carry a proof that matches our community string.
-		if meta.features&FeatureCommunity == 0 {
-			_ = conn.Close()
-			return ErrHandshakeCommunityRequired
-		}
-		if !verifyCommunityProof(community, meta.communityProof, meta.publicKey) {
+		remoteHasCommunity := meta.features&FeatureCommunity != 0
+		if !remoteHasCommunity {
+			allowLegacyOutbound := communityMode == CommunityModeSoft && linkType != linkTypeIncoming
+			if !allowLegacyOutbound {
+				_ = conn.Close()
+				return ErrHandshakeCommunityRequired
+			}
+			communityStatus = "legacy"
+		} else if !verifyCommunityProof(community, meta.communityProof, meta.publicKey) {
 			_ = conn.Close()
 			return ErrHandshakeCommunityMismatch
+		} else {
+			communityStatus = "strict"
 		}
 	}
 	if err := meta.verifySignature(sig, options.password); err != nil {
@@ -713,6 +722,11 @@ func (l *links) handler(linkType linkType, options linkOptions, conn net.Conn, s
 	}
 	if err = conn.SetDeadline(time.Time{}); err != nil {
 		return fmt.Errorf("failed to clear handshake deadline: %w", err)
+	}
+	if state != nil {
+		phony.Block(l, func() {
+			state.communityStatus = communityStatus
+		})
 	}
 	// Check that the node isn't trying to connect to itself.
 	if meta.publicKey.Equal(l.core.public) {

@@ -4,6 +4,32 @@ import (
 	"testing"
 )
 
+func TestGenerateConfigDefaultsCommunityModeToStrict(t *testing.T) {
+	cfg := GenerateConfig()
+	if cfg.CommunityMode != "strict" {
+		t.Fatalf("unexpected CommunityMode default: %q", cfg.CommunityMode)
+	}
+}
+
+func TestPostprocessConfigNormalizesEmptyCommunityModeToStrict(t *testing.T) {
+	cfg := GenerateConfig()
+	cfg.CommunityMode = ""
+	if err := cfg.postprocessConfig(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CommunityMode != "strict" {
+		t.Fatalf("unexpected CommunityMode after normalization: %q", cfg.CommunityMode)
+	}
+}
+
+func TestPostprocessConfigRejectsInvalidCommunityMode(t *testing.T) {
+	cfg := GenerateConfig()
+	cfg.CommunityMode = "invalid"
+	if err := cfg.postprocessConfig(); err == nil {
+		t.Fatal("expected invalid CommunityMode to be rejected")
+	}
+}
+
 func TestConfig_Keys(t *testing.T) {
 	/*
 		var nodeConfig NodeConfig

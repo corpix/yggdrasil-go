@@ -30,6 +30,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hjson/hjson-go/v4"
@@ -57,7 +58,8 @@ type NodeConfig struct {
 	NodeInfo            map[string]interface{}     `comment:"Optional nodeinfo. This must be a { \"key\": \"value\", ... } map\nor set as null. This is entirely optional but, if set, is visible\nto the whole network on request."`
 	PrometheusEnabled   bool                       `json:",omitempty" comment:"Enable the built-in Prometheus metrics endpoint. Disabled by default."`
 	PrometheusListen    string                     `json:",omitempty" comment:"Listen address for the Prometheus metrics HTTP endpoint.\nDefaults to 127.0.0.1:9756 when PrometheusEnabled is true."`
-	Community           string                     `json:",omitempty" comment:"Optional community string for private network isolation. When set, only\nnodes with the same community string can peer with this node. The string\nis never transmitted in plaintext — it is used as a cryptographic key\nin the handshake signature. Leave empty to disable (default)."`
+	Community           string                     `json:",omitempty" comment:"Optional community string for private network isolation. When set, only\nnodes with the same community string can peer with this node. The string\nis never transmitted in plaintext — it is used to derive key material\nfor the handshake proof. Leave empty to disable (default)."`
+	CommunityMode       string                     `json:",omitempty" comment:"Controls how community-enabled nodes treat peers without community\nsupport. Allowed values are \"strict\" and \"soft\". Strict (default)\nrequires matching community support on both sides. Soft allows outbound\nconnections to peers without the community feature, while still rejecting\ninbound legacy peers and mismatching communities."`
 	AddressPrefix       string                     `json:",omitempty" comment:"First byte of the IPv6 address prefix as a two-character hex string\n(e.g. \"02\" = 200::/7, \"04\" = 400::/7, \"fc\" = FC00::/7). Must be an\neven value — the low bit is reserved for internal use. All nodes in\nthe same network must use the same prefix. Defaults to \"02\"."`
 }
 
@@ -91,6 +93,7 @@ func GenerateConfig() *NodeConfig {
 	cfg.NodeInfoPrivacy = false
 	cfg.PrometheusEnabled = false
 	cfg.PrometheusListen = "127.0.0.1:9756"
+	cfg.CommunityMode = "strict"
 	if err := cfg.postprocessConfig(); err != nil {
 		panic(err)
 	}
@@ -135,6 +138,14 @@ func (cfg *NodeConfig) UnmarshalHJSON(b []byte) error {
 }
 
 func (cfg *NodeConfig) postprocessConfig() error {
+	switch mode := strings.ToLower(strings.TrimSpace(cfg.CommunityMode)); mode {
+	case "", "strict":
+		cfg.CommunityMode = "strict"
+	case "soft":
+		cfg.CommunityMode = "soft"
+	default:
+		return fmt.Errorf("invalid CommunityMode %q: must be \"strict\" or \"soft\"", cfg.CommunityMode)
+	}
 	if cfg.PrivateKeyPath != "" {
 		cfg.PrivateKey = nil
 		f, err := os.ReadFile(cfg.PrivateKeyPath)

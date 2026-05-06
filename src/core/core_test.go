@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"net/url"
 	"os"
 	"testing"
@@ -25,24 +26,31 @@ func GetLoggerWithPrefix(prefix string, verbose bool) *log.Logger {
 	return l
 }
 
-func require_NoError(t *testing.T, err error) {
+func require_NoError(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func require_Equal[T comparable](t *testing.T, a, b T) {
+func require_Equal[T comparable](t testing.TB, a, b T) {
 	t.Helper()
 	if a != b {
 		t.Fatalf("%v != %v", a, b)
 	}
 }
 
-func require_True(t *testing.T, a bool) {
+func require_True(t testing.TB, a bool) {
 	t.Helper()
 	if !a {
 		t.Fatal("expected true")
+	}
+}
+
+func require_ErrorIs(t testing.TB, err, target error) {
+	t.Helper()
+	if !errors.Is(err, target) {
+		t.Fatalf("expected error %v, got %v", target, err)
 	}
 }
 
@@ -95,6 +103,50 @@ func CreateAndConnectTwo(t testing.TB, verbose bool) (nodeA *Core, nodeB *Core) 
 	}
 
 	return nodeA, nodeB
+}
+
+func createNodePair(t testing.TB, optsA, optsB []SetupOption) (nodeA *Core, nodeB *Core, peerURL *url.URL) {
+	t.Helper()
+
+	cfgA, cfgB := config.GenerateConfig(), config.GenerateConfig()
+	require_NoError(t, cfgA.GenerateSelfSignedCertificate())
+	require_NoError(t, cfgB.GenerateSelfSignedCertificate())
+
+	logger := GetLoggerWithPrefix("", false)
+	logger.EnableLevel("debug")
+
+	var err error
+	nodeA, err = New(cfgA.Certificate, logger, optsA...)
+	require_NoError(t, err)
+
+	nodeB, err = New(cfgB.Certificate, logger, optsB...)
+	require_NoError(t, err)
+
+	listenURL, err := url.Parse("tcp://localhost:0")
+	require_NoError(t, err)
+	listener, err := nodeA.Listen(listenURL, "")
+	require_NoError(t, err)
+
+	peerURL, err = url.Parse("tcp://" + listener.Addr().String())
+	require_NoError(t, err)
+	return nodeA, nodeB, peerURL
+}
+
+func waitForPersistentPeer(t testing.TB, node *Core, check func(PeerInfo) bool) PeerInfo {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		peers := node.GetPeers()
+		if len(peers) == 1 && check(peers[0]) {
+			return peers[0]
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	peers := node.GetPeers()
+	t.Fatalf("timed out waiting for peer state, peers=%+v", peers)
+	return PeerInfo{}
 }
 
 // WaitConnected blocks until either nodes negotiated DHT or 5 seconds passed.
@@ -287,4 +339,109 @@ func TestAllowedPublicKeysLocal(t *testing.T) {
 	require_Equal(t, len(peers), 1)
 	require_True(t, peers[0].Up)
 	require_True(t, peers[0].LastError == nil)
+}
+
+func TestCommunityModeStrictRejectsOutboundLegacyPeer(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, nil, []SetupOption{
+		Community([]byte("community")),
+		CommunityMode(CommunityModeStrict),
+	})
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return !peer.Up && peer.LastError != nil
+	})
+	require_ErrorIs(t, peer.LastError, ErrHandshakeCommunityRequired)
+	require_Equal(t, peer.CommunityStatus, "")
+}
+
+func TestCommunityModeSoftAllowsOutboundLegacyPeer(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, nil, []SetupOption{
+		Community([]byte("community")),
+		CommunityMode(CommunityModeSoft),
+	})
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+	if !WaitConnected(nodeA, nodeB) {
+		t.Fatal("nodes did not connect")
+	}
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return peer.Up && peer.LastError == nil
+	})
+	require_True(t, peer.Up)
+	require_Equal(t, peer.CommunityStatus, "legacy")
+}
+
+func TestCommunityModeSoftRejectsInboundLegacyPeer(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, []SetupOption{
+		Community([]byte("community")),
+		CommunityMode(CommunityModeSoft),
+	}, nil)
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return !peer.Up && peer.LastError != nil
+	})
+	require_True(t, !peer.Up)
+	require_Equal(t, peer.CommunityStatus, "")
+}
+
+func TestCommunityModeSoftRejectsMismatchedCommunity(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, []SetupOption{
+		Community([]byte("community-a")),
+	}, []SetupOption{
+		Community([]byte("community-b")),
+		CommunityMode(CommunityModeSoft),
+	})
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return !peer.Up && peer.LastError != nil
+	})
+	require_ErrorIs(t, peer.LastError, ErrHandshakeCommunityMismatch)
+	require_Equal(t, peer.CommunityStatus, "")
+}
+
+func TestCommunityStatusStrictForMatchedPeer(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, []SetupOption{
+		Community([]byte("community")),
+	}, []SetupOption{
+		Community([]byte("community")),
+		CommunityMode(CommunityModeStrict),
+	})
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+	if !WaitConnected(nodeA, nodeB) {
+		t.Fatal("nodes did not connect")
+	}
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return peer.Up && peer.LastError == nil
+	})
+	require_Equal(t, peer.CommunityStatus, "strict")
+}
+
+func TestCommunityStatusOffWithoutLocalCommunity(t *testing.T) {
+	nodeA, nodeB := CreateAndConnectTwo(t, true)
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return peer.Up && peer.LastError == nil
+	})
+	require_Equal(t, peer.CommunityStatus, "off")
 }

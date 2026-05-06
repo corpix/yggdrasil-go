@@ -20,24 +20,25 @@ type SelfInfo struct {
 }
 
 type PeerInfo struct {
-	URI           string
-	Up            bool
-	Inbound       bool
-	SNI           string
-	LastError     error
-	LastErrorTime time.Time
-	Key           ed25519.PublicKey
-	Root          ed25519.PublicKey
-	Coords        []uint64
-	Port          uint64
-	Priority      uint8
-	Cost          uint64
-	RXBytes       uint64
-	TXBytes       uint64
-	RXRate        uint64
-	TXRate        uint64
-	Uptime        time.Duration
-	Latency       time.Duration
+	URI             string
+	Up              bool
+	Inbound         bool
+	SNI             string
+	CommunityStatus string
+	LastError       error
+	LastErrorTime   time.Time
+	Key             ed25519.PublicKey
+	Root            ed25519.PublicKey
+	Coords          []uint64
+	Port            uint64
+	Priority        uint8
+	Cost            uint64
+	RXBytes         uint64
+	TXBytes         uint64
+	RXRate          uint64
+	TXRate          uint64
+	Uptime          time.Duration
+	Latency         time.Duration
 }
 
 type TreeEntryInfo struct {
@@ -84,6 +85,7 @@ func (c *Core) GetPeers() []PeerInfo {
 			peerinfo.URI = info.uri
 			peerinfo.LastError = state._err
 			peerinfo.LastErrorTime = state._errtime
+			peerinfo.CommunityStatus = state.communityStatus
 			if c := state._conn; c != nil {
 				conn = c
 				peerinfo.Up = true

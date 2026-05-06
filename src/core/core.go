@@ -44,6 +44,7 @@ type Core struct {
 		_allowedPublicKeys map[[32]byte]struct{}      // configurable after startup
 		outboundSNIList    []string                   // immutable after startup
 		community          []byte                     // immutable after startup
+		communityMode      CommunityMode              // immutable after startup
 	}
 	pathNotify func(ed25519.PublicKey)
 }
@@ -67,6 +68,7 @@ func New(cert *tls.Certificate, logger Logger, opts ...SetupOption) (*Core, erro
 	var err error
 	c.config._listeners = map[ListenAddress]struct{}{}
 	c.config._allowedPublicKeys = map[[32]byte]struct{}{}
+	c.config.communityMode = CommunityModeStrict
 	for _, opt := range opts {
 		switch opt.(type) {
 		case Peer, ListenAddress:

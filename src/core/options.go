@@ -39,6 +39,15 @@ func (c *Core) _applyOption(opt SetupOption) (err error) {
 		c.config.outboundSNIList = append([]string(nil), v...)
 	case Community:
 		c.config.community = append([]byte(nil), v...)
+	case CommunityMode:
+		switch v {
+		case "", CommunityModeStrict:
+			c.config.communityMode = CommunityModeStrict
+		case CommunityModeSoft:
+			c.config.communityMode = v
+		default:
+			return fmt.Errorf("invalid community mode %q", v)
+		}
 	}
 	return
 }
@@ -58,6 +67,12 @@ type AllowedPublicKey ed25519.PublicKey
 type PeerFilter func(net.IP) bool
 type OutboundSNIList []string
 type Community []byte
+type CommunityMode string
+
+const (
+	CommunityModeStrict CommunityMode = "strict"
+	CommunityModeSoft   CommunityMode = "soft"
+)
 
 func (a ListenAddress) isSetupOption()    {}
 func (a Peer) isSetupOption()             {}
@@ -67,3 +82,4 @@ func (a AllowedPublicKey) isSetupOption() {}
 func (a PeerFilter) isSetupOption()       {}
 func (a OutboundSNIList) isSetupOption()  {}
 func (a Community) isSetupOption()        {}
+func (a CommunityMode) isSetupOption()    {}

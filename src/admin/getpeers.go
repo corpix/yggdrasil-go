@@ -19,23 +19,24 @@ type GetPeersResponse struct {
 }
 
 type PeerEntry struct {
-	URI           string        `json:"remote,omitempty"`
-	Up            bool          `json:"up"`
-	Inbound       bool          `json:"inbound"`
-	SNI           string        `json:"sni,omitempty"`
-	IPAddress     string        `json:"address,omitempty"`
-	PublicKey     string        `json:"key"`
-	Port          uint64        `json:"port"`
-	Priority      uint64        `json:"priority"`
-	Cost          uint64        `json:"cost"`
-	RXBytes       DataUnit      `json:"bytes_recvd,omitempty"`
-	TXBytes       DataUnit      `json:"bytes_sent,omitempty"`
-	RXRate        DataUnit      `json:"rate_recvd,omitempty"`
-	TXRate        DataUnit      `json:"rate_sent,omitempty"`
-	Uptime        float64       `json:"uptime,omitempty"`
-	Latency       time.Duration `json:"latency,omitempty"`
-	LastErrorTime time.Duration `json:"last_error_time,omitempty"`
-	LastError     string        `json:"last_error,omitempty"`
+	URI             string        `json:"remote,omitempty"`
+	Up              bool          `json:"up"`
+	Inbound         bool          `json:"inbound"`
+	CommunityStatus string        `json:"community_status,omitempty"`
+	SNI             string        `json:"sni,omitempty"`
+	IPAddress       string        `json:"address,omitempty"`
+	PublicKey       string        `json:"key"`
+	Port            uint64        `json:"port"`
+	Priority        uint64        `json:"priority"`
+	Cost            uint64        `json:"cost"`
+	RXBytes         DataUnit      `json:"bytes_recvd,omitempty"`
+	TXBytes         DataUnit      `json:"bytes_sent,omitempty"`
+	RXRate          DataUnit      `json:"rate_recvd,omitempty"`
+	TXRate          DataUnit      `json:"rate_sent,omitempty"`
+	Uptime          float64       `json:"uptime,omitempty"`
+	Latency         time.Duration `json:"latency,omitempty"`
+	LastErrorTime   time.Duration `json:"last_error_time,omitempty"`
+	LastError       string        `json:"last_error,omitempty"`
 }
 
 func (a *AdminSocket) getPeersHandler(req *GetPeersRequest, res *GetPeersResponse) error {
@@ -43,18 +44,19 @@ func (a *AdminSocket) getPeersHandler(req *GetPeersRequest, res *GetPeersRespons
 	res.Peers = make([]PeerEntry, 0, len(peers))
 	for _, p := range peers {
 		peer := PeerEntry{
-			Port:     p.Port,
-			Up:       p.Up,
-			Inbound:  p.Inbound,
-			SNI:      p.SNI,
-			Priority: uint64(p.Priority), // can't be uint8 thanks to gobind
-			Cost:     p.Cost,
-			URI:      p.URI,
-			RXBytes:  DataUnit(p.RXBytes),
-			TXBytes:  DataUnit(p.TXBytes),
-			RXRate:   DataUnit(p.RXRate),
-			TXRate:   DataUnit(p.TXRate),
-			Uptime:   p.Uptime.Seconds(),
+			Port:            p.Port,
+			Up:              p.Up,
+			Inbound:         p.Inbound,
+			CommunityStatus: p.CommunityStatus,
+			SNI:             p.SNI,
+			Priority:        uint64(p.Priority), // can't be uint8 thanks to gobind
+			Cost:            p.Cost,
+			URI:             p.URI,
+			RXBytes:         DataUnit(p.RXBytes),
+			TXBytes:         DataUnit(p.TXBytes),
+			RXRate:          DataUnit(p.RXRate),
+			TXRate:          DataUnit(p.TXRate),
+			Uptime:          p.Uptime.Seconds(),
 		}
 		if p.Latency > 0 {
 			peer.Latency = p.Latency

@@ -24,10 +24,10 @@ import (
 	"net/url"
 	"time"
 
+	"filippo.io/edwards25519"
 	goreality "github.com/xtls/reality"
 	xraynet "github.com/xtls/xray-core/common/net"
 	xrayreality "github.com/xtls/xray-core/transport/internet/reality"
-	"filippo.io/edwards25519"
 )
 
 type linkXrayReality struct {

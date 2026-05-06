@@ -52,10 +52,10 @@ type handshakeError string
 
 func (e handshakeError) Error() string { return string(e) }
 
-const ErrHandshakeInvalidPreamble   = handshakeError("invalid handshake, remote side is not Yggdrasil")
-const ErrHandshakeInvalidLength     = handshakeError("invalid handshake length, possible version mismatch")
-const ErrHandshakeInvalidPassword   = handshakeError("invalid password supplied, check your config")
-const ErrHandshakeHashFailure       = handshakeError("invalid hash length")
+const ErrHandshakeInvalidPreamble = handshakeError("invalid handshake, remote side is not Yggdrasil")
+const ErrHandshakeInvalidLength = handshakeError("invalid handshake length, possible version mismatch")
+const ErrHandshakeInvalidPassword = handshakeError("invalid password supplied, check your config")
+const ErrHandshakeHashFailure = handshakeError("invalid hash length")
 const ErrHandshakeIncorrectPassword = handshakeError("password does not match remote side")
 const ErrHandshakeCommunityRequired = handshakeError("remote node does not support the community feature")
 const ErrHandshakeCommunityMismatch = handshakeError("community string does not match remote node")
@@ -68,11 +68,23 @@ func version_getBaseMetadata() version_metadata {
 	}
 }
 
+// communityProofKey returns the BLAKE2b keyed-hash key for a configured
+// community string. Short values are used directly for compatibility, while
+// longer values are reduced to a fixed-size digest first.
+func communityProofKey(community []byte) []byte {
+	if len(community) <= blake2b.Size {
+		return community
+	}
+	key := blake2b.Sum512(community)
+	return key[:]
+}
+
 // newCommunityProof computes the community handshake proof for a public key.
-// The proof is blake2b-512 keyed with the community string over the public key.
-// It proves knowledge of the community string without revealing it.
+// The proof is blake2b-512 keyed with key material derived from the community
+// string over the public key. It proves knowledge of the community string
+// without revealing it.
 func newCommunityProof(community []byte, pubkey ed25519.PublicKey) ([]byte, error) {
-	hasher, err := blake2b.New512(community)
+	hasher, err := blake2b.New512(communityProofKey(community))
 	if err != nil {
 		return nil, err
 	}

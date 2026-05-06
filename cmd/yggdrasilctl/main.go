@@ -193,7 +193,7 @@ func run() int {
 		if err := json.Unmarshal(recv.Response, &resp); err != nil {
 			panic(err)
 		}
-		table.Header([]string{"URI", "State", "Dir", "IP Address", "Uptime", "RTT", "RX", "TX", "Down", "Up", "Pr", "Cost", "Last Error"})
+		table.Header([]string{"URI", "State", "Dir", "Community", "IP Address", "Uptime", "RTT", "RX", "TX", "Down", "Up", "Pr", "Cost", "Last Error"})
 		for _, peer := range resp.Peers {
 			state, lasterr, dir, rtt, rxr, txr := "Up", "-", "Out", "-", "-", "-"
 			if !peer.Up {
@@ -221,6 +221,7 @@ func run() int {
 				uristring,
 				state,
 				dir,
+				peer.CommunityStatus,
 				peer.IPAddress,
 				(time.Duration(peer.Uptime) * time.Second).String(),
 				rtt,
