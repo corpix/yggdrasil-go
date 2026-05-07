@@ -57,7 +57,6 @@ type ListEntry struct {
 	Fields      []string `json:"fields,omitempty"`
 }
 
-// AddHandler is called for each admin function to add the handler and help documentation to the API.
 func (a *AdminSocket) AddHandler(name, desc string, args []string, handlerfunc core.AddHandlerFunc) error {
 	if _, ok := a.handlers[strings.ToLower(name)]; ok {
 		return errors.New("handler already exists")
@@ -262,7 +261,6 @@ func (a *AdminSocket) SetupAdminHandlers() {
 	)
 }
 
-// IsStarted returns true if the module has been started.
 func (a *AdminSocket) IsStarted() bool {
 	select {
 	case <-a.done:
@@ -274,7 +272,6 @@ func (a *AdminSocket) IsStarted() bool {
 	}
 }
 
-// Stop will stop the admin API and close the socket.
 func (a *AdminSocket) Stop() error {
 	if a == nil {
 		return nil
@@ -288,6 +285,42 @@ func (a *AdminSocket) Stop() error {
 		return a.listener.Close()
 	}
 	return nil
+}
+
+// CallHandler calls an admin handler directly by name without using socket
+func (a *AdminSocket) CallHandler(name string, args json.RawMessage) (interface{}, error) {
+	if a == nil {
+		return nil, errors.New("admin socket not initialized")
+	}
+
+	reqname := strings.ToLower(name)
+	handler, ok := a.handlers[reqname]
+	if !ok {
+		return nil, fmt.Errorf("unknown action '%s', try 'list' for help", reqname)
+	}
+
+	return handler.handler(args)
+}
+
+func (a *AdminSocket) GetAvailableCommands() []ListEntry {
+	if a == nil {
+		return nil
+	}
+
+	var list []ListEntry
+	for name, handler := range a.handlers {
+		list = append(list, ListEntry{
+			Command:     name,
+			Description: handler.desc,
+			Fields:      handler.args,
+		})
+	}
+
+	sort.SliceStable(list, func(i, j int) bool {
+		return strings.Compare(list[i].Command, list[j].Command) < 0
+	})
+
+	return list
 }
 
 // listen is run by start and manages API connections.
@@ -309,7 +342,6 @@ func (a *AdminSocket) listen() {
 	}
 }
 
-// handleRequest calls the request handler for each request sent to the admin API.
 func (a *AdminSocket) handleRequest(conn net.Conn) {
 	decoder := json.NewDecoder(conn)
 	decoder.DisallowUnknownFields()

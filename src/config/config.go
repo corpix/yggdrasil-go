@@ -30,6 +30,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -61,6 +62,7 @@ type NodeConfig struct {
 	Community           string                     `json:",omitempty" comment:"Optional community string for private network isolation. When set, only\nnodes with the same community string can peer with this node. The string\nis never transmitted in plaintext — it is used to derive key material\nfor the handshake proof. Leave empty to disable (default)."`
 	CommunityMode       string                     `json:",omitempty" comment:"Controls how community-enabled nodes treat peers without community\nsupport. Allowed values are \"strict\" and \"soft\". Strict (default)\nrequires matching community support on both sides. Soft allows outbound\nconnections to peers without the community feature, while still rejecting\ninbound legacy peers and mismatching communities."`
 	AddressPrefix       string                     `json:",omitempty" comment:"First byte of the IPv6 address prefix as a two-character hex string\n(e.g. \"02\" = 200::/7, \"04\" = 400::/7, \"fc\" = FC00::/7). Must be an\neven value — the low bit is reserved for internal use. All nodes in\nthe same network must use the same prefix. Defaults to \"02\"."`
+	WebUI               WebUIConfig                `comment:"Web interface configuration for managing the node through a browser."`
 }
 
 type MulticastInterfaceConfig struct {
@@ -70,6 +72,13 @@ type MulticastInterfaceConfig struct {
 	Port     uint16 `json:",omitempty"`
 	Priority uint64 `json:",omitempty"` // really uint8, but gobind won't export it
 	Password string
+}
+
+type WebUIConfig struct {
+	Enable   bool   `comment:"Enable the web interface for managing the node through a browser."`
+	Port     uint16 `comment:"Port for the web interface. Default is 9000."`
+	Host     string `comment:"Host/IP address to bind the web interface to. Empty means all interfaces."`
+	Password string `comment:"Password for accessing the web interface. If empty, no authentication is required."`
 }
 
 // Generates default configuration and returns a pointer to the resulting
@@ -94,6 +103,12 @@ func GenerateConfig() *NodeConfig {
 	cfg.PrometheusEnabled = false
 	cfg.PrometheusListen = "127.0.0.1:9756"
 	cfg.CommunityMode = "strict"
+	cfg.WebUI = WebUIConfig{
+		Enable:   false,
+		Port:     9000,
+		Host:     "127.0.0.1",
+		Password: "",
+	}
 	if err := cfg.postprocessConfig(); err != nil {
 		panic(err)
 	}
@@ -276,4 +291,194 @@ func (k *KeyBytes) UnmarshalJSON(b []byte) error {
 	}
 	*k, err = hex.DecodeString(s)
 	return err
+}
+
+type ConfigInfo struct {
+	Path   string      `json:"path"`
+	Format string      `json:"format"`
+	Data   interface{} `json:"data"`
+}
+
+var (
+	currentConfigPath string
+	currentConfigData *NodeConfig
+)
+
+// validateConfigPath validates and cleans a configuration file path to prevent path traversal attacks
+func validateConfigPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+
+	// Check for null bytes and other dangerous characters
+	if strings.Contains(path, "\x00") {
+		return "", fmt.Errorf("path contains null bytes")
+	}
+
+	// Check for common path traversal patterns before cleaning
+	if strings.Contains(path, "..") || strings.Contains(path, "//") || strings.Contains(path, "\\\\") {
+		return "", fmt.Errorf("invalid path: contains path traversal sequences")
+	}
+
+	cleanPath := filepath.Clean(path)
+
+	// Convert to absolute path to prevent relative path issues
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+
+	// Double-check for path traversal after cleaning
+	if strings.Contains(absPath, "..") {
+		return "", fmt.Errorf("path contains traversal sequences after cleaning")
+	}
+
+	// Ensure the path is within reasonable bounds (no control characters)
+	for _, r := range absPath {
+		if r < 32 && r != '\t' && r != '\n' && r != '\r' {
+			return "", fmt.Errorf("invalid path: contains control characters")
+		}
+		if r == 127 || (r >= 128 && r <= 159) {
+			return "", fmt.Errorf("invalid path: contains control characters")
+		}
+	}
+
+	if strings.Count(absPath, "/") > 10 {
+		return "", fmt.Errorf("path too deep: potential security risk")
+	}
+
+	return absPath, nil
+}
+
+func SetCurrentConfig(path string, cfg *NodeConfig) {
+	if path != "" {
+		if validatedPath, err := validateConfigPath(path); err == nil {
+			currentConfigPath = validatedPath
+		} else {
+			currentConfigPath = "" // swallow the error; webui just won't have a path to offer
+		}
+	} else {
+		currentConfigPath = path
+	}
+	currentConfigData = cfg
+}
+
+func GetCurrentConfig() (*ConfigInfo, error) {
+	var configPath string
+	var configData *NodeConfig
+	format := "hjson"
+
+	if currentConfigPath != "" && currentConfigData != nil {
+		validatedCurrentPath, err := validateConfigPath(currentConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid current config path: %v", err)
+		}
+		configPath = validatedCurrentPath
+		configData = currentConfigData
+	} else {
+		defaults := GetDefaults()
+		validatedDefaultPath, err := validateConfigPath(defaults.DefaultConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("invalid default config path: %v", err)
+		}
+		configPath = validatedDefaultPath
+		configData = GenerateConfig()
+	}
+
+	if _, err := os.Stat(configPath); err == nil {
+		data, err := os.ReadFile(configPath)
+		if err == nil {
+			cfg := GenerateConfig()
+			if err := hjson.Unmarshal(data, cfg); err == nil {
+				configData = cfg
+				var jsonTest interface{}
+				if json.Unmarshal(data, &jsonTest) == nil {
+					format = "json"
+				}
+			} else {
+				return nil, fmt.Errorf("failed to parse config file: %v", err)
+			}
+		}
+	}
+
+	return &ConfigInfo{
+		Path:   configPath,
+		Format: format,
+		Data:   configData,
+	}, nil
+}
+
+func SaveConfig(configData interface{}, configPath, format string) error {
+	var testConfig NodeConfig
+	configBytes, err := json.Marshal(configData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config data: %v", err)
+	}
+
+	if err := json.Unmarshal(configBytes, &testConfig); err != nil {
+		return fmt.Errorf("invalid configuration data: %v", err)
+	}
+
+	targetPath := configPath
+	if targetPath == "" {
+		if currentConfigPath != "" {
+			targetPath = currentConfigPath
+		} else {
+			defaults := GetDefaults()
+			targetPath = defaults.DefaultConfigFile
+		}
+	}
+
+	// Validate and clean the target path to prevent path traversal attacks
+	validatedPath, err := validateConfigPath(targetPath)
+	if err != nil {
+		return fmt.Errorf("invalid target path: %v", err)
+	}
+	targetPath = validatedPath
+
+	targetFormat := format
+	if targetFormat == "" {
+		if _, err := os.Stat(targetPath); err == nil {
+			data, readErr := os.ReadFile(targetPath)
+			if readErr == nil {
+				var jsonTest interface{}
+				if json.Unmarshal(data, &jsonTest) == nil {
+					targetFormat = "json"
+				} else {
+					targetFormat = "hjson"
+				}
+			}
+		}
+		if targetFormat == "" {
+			targetFormat = "hjson"
+		}
+	}
+
+	dir := filepath.Clean(filepath.Dir(targetPath))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %v", err)
+	}
+
+	var outputData []byte
+	if targetFormat == "json" {
+		outputData, err = json.MarshalIndent(configData, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %v", err)
+		}
+	} else {
+		outputData, err = hjson.Marshal(configData)
+		if err != nil {
+			return fmt.Errorf("failed to marshal HJSON: %v", err)
+		}
+	}
+
+	if err := os.WriteFile(targetPath, outputData, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %v", err)
+	}
+
+	if targetPath == currentConfigPath {
+		currentConfigData = &testConfig
+	}
+
+	return nil
 }

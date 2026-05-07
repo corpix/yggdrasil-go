@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"golang.org/x/crypto/blake2b"
@@ -23,6 +24,7 @@ type version_metadata struct {
 	priority       uint8
 	features       uint64
 	communityProof []byte // 64-byte blake2b-512 HMAC; nil when FeatureCommunity is not set
+	nodeInfo       []byte // NodeInfo data from configuration
 }
 
 const (
@@ -46,6 +48,7 @@ const (
 	metaPriority                     // uint8
 	metaFeatures                     // uint64 — only emitted when non-zero; old nodes skip it
 	metaCommunityProof               // [64]byte blake2b-512(key=community)[pubkey]; old nodes skip it
+	metaNodeInfo                     // []byte
 )
 
 type handshakeError string
@@ -136,6 +139,15 @@ func (m *version_metadata) encode(privateKey ed25519.PrivateKey, password []byte
 		bs = append(bs, m.communityProof...)
 	}
 
+	if len(m.nodeInfo) > 0 {
+		if len(m.nodeInfo) > 16384 {
+			return nil, fmt.Errorf("NodeInfo exceeds max length of 16384 bytes")
+		}
+		bs = binary.BigEndian.AppendUint16(bs, metaNodeInfo)
+		bs = binary.BigEndian.AppendUint16(bs, uint16(len(m.nodeInfo)))
+		bs = append(bs, m.nodeInfo...)
+	}
+
 	hasher, err := blake2b.New512(password)
 	if err != nil {
 		return nil, ErrHandshakeInvalidPassword
@@ -194,6 +206,12 @@ func (m *version_metadata) decodeTLV(r io.Reader) (sig []byte, err error) {
 			}
 		case metaCommunityProof:
 			m.communityProof = append([]byte(nil), bs[:oplen]...)
+		case metaNodeInfo:
+			if oplen > 16384 {
+				return nil, fmt.Errorf("received NodeInfo exceeds max length of 16384 bytes")
+			}
+			m.nodeInfo = make([]byte, oplen)
+			copy(m.nodeInfo, bs[:oplen])
 		}
 		bs = bs[oplen:]
 	}

@@ -71,9 +71,10 @@ type link struct {
 	sni             string             // Last observed/used SNI for this link
 	communityStatus string             // Last established community classification for this link
 	// The remaining fields can only be modified safely from within the links actor
-	_conn    *linkConn // Connected link, if any, nil if not connected
-	_err     error     // Last error on the connection, if any
-	_errtime time.Time // Last time an error occurred
+	_conn     *linkConn // Connected link, if any, nil if not connected
+	_err      error     // Last error on the connection, if any
+	_errtime  time.Time // Last time an error occurred
+	_nodeInfo []byte    // received during handshake
 }
 
 type linkOptions struct {
@@ -762,6 +763,15 @@ func (l *links) handler(state *link, linkType linkType, options linkOptions, con
 		}
 		if linkType == linkTypeIncoming && !isallowed {
 			return fmt.Errorf("node public key %q is not in AllowedPublicKeys", hex.EncodeToString(meta.publicKey))
+		}
+	}
+
+	if len(meta.nodeInfo) > 0 {
+		if state != nil {
+			phony.Block(l, func() {
+				state._nodeInfo = make([]byte, len(meta.nodeInfo))
+				copy(state._nodeInfo, meta.nodeInfo)
+			})
 		}
 	}
 

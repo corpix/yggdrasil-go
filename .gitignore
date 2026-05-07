@@ -1,4 +1,5 @@
 /nix-cage.json
 /yggdrasil
 /yggdrasilctl
+/yggdrasil.*
 *.log
