@@ -35,15 +35,16 @@ const minimumBackoffLimit = time.Second * 5
 
 type links struct {
 	phony.Inbox
-	core        *Core
-	tcp         *linkTCP         // TCP interface support
-	tls         *linkTLS         // TLS interface support
-	unix        *linkUNIX        // UNIX interface support
-	socks       *linkSOCKS       // SOCKS interface support
-	quic        *linkQUIC        // QUIC interface support
-	ws          *linkWS          // WS interface support
-	wss         *linkWSS         // WSS interface support
-	xrayReality *linkXrayReality // REALITY/uTLS over raw TCP
+	core         *Core
+	tcp          *linkTCP          // TCP interface support
+	tls          *linkTLS          // TLS interface support
+	unix         *linkUNIX         // UNIX interface support
+	socks        *linkSOCKS        // SOCKS interface support
+	quic         *linkQUIC         // QUIC interface support
+	ws           *linkWS           // WS interface support
+	wss          *linkWSS          // WSS interface support
+	xrayReality  *linkXrayReality  // REALITY/uTLS over raw TCP
+	xrayHysteria *linkXrayHysteria // Hysteria/QUIC over UDP
 	// _links can only be modified safely from within the links actor
 	_links     map[linkInfo]*link // *link is nil if connection in progress
 	_listeners map[*Listener]context.CancelFunc
@@ -103,6 +104,7 @@ func (l *links) init(c *Core) error {
 	l.ws = l.newLinkWS()
 	l.wss = l.newLinkWSS()
 	l.xrayReality = l.newLinkXrayReality()
+	l.xrayHysteria = l.newLinkXrayHysteria()
 	l._links = make(map[linkInfo]*link)
 	l._listeners = make(map[*Listener]context.CancelFunc)
 
@@ -479,6 +481,8 @@ func (l *links) listen(u *url.URL, sintf string, local bool) (*Listener, error) 
 		protocol = l.wss
 	case "xray+reality":
 		protocol = l.xrayReality
+	case "xray+hysteria":
+		protocol = l.xrayHysteria
 	default:
 		ctxcancel()
 		return nil, ErrLinkUnrecognisedSchema
@@ -650,6 +654,8 @@ func (l *links) dialerFor(u *url.URL) (linkProtocol, error) {
 		dialer = l.wss
 	case "xray+reality":
 		dialer = l.xrayReality
+	case "xray+hysteria":
+		dialer = l.xrayHysteria
 	default:
 		return nil, ErrLinkUnrecognisedSchema
 	}

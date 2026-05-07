@@ -17,6 +17,29 @@ github.com/VividCortex/ewma
 # github.com/andybalholm/brotli v1.0.6
 ## explicit; go 1.12
 github.com/andybalholm/brotli
+# github.com/apernet/quic-go v0.59.1-0.20260425001925-6c6cc9bcb716
+## explicit; go 1.24
+github.com/apernet/quic-go
+github.com/apernet/quic-go/congestion
+github.com/apernet/quic-go/http3
+github.com/apernet/quic-go/http3/qlog
+github.com/apernet/quic-go/internal/ackhandler
+github.com/apernet/quic-go/internal/congestion
+github.com/apernet/quic-go/internal/flowcontrol
+github.com/apernet/quic-go/internal/handshake
+github.com/apernet/quic-go/internal/monotime
+github.com/apernet/quic-go/internal/protocol
+github.com/apernet/quic-go/internal/qerr
+github.com/apernet/quic-go/internal/utils
+github.com/apernet/quic-go/internal/utils/linkedlist
+github.com/apernet/quic-go/internal/utils/ringbuffer
+github.com/apernet/quic-go/internal/utils/tree
+github.com/apernet/quic-go/internal/wire
+github.com/apernet/quic-go/monotime
+github.com/apernet/quic-go/qlog
+github.com/apernet/quic-go/qlogwriter
+github.com/apernet/quic-go/qlogwriter/jsontext
+github.com/apernet/quic-go/quicvarint
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -120,8 +143,8 @@ github.com/olekukonko/tablewriter/pkg/twwarp
 github.com/olekukonko/tablewriter/pkg/twwidth
 github.com/olekukonko/tablewriter/renderer
 github.com/olekukonko/tablewriter/tw
-# github.com/pires/go-proxyproto v0.11.0
-## explicit; go 1.24
+# github.com/pires/go-proxyproto v0.12.0
+## explicit; go 1.25
 github.com/pires/go-proxyproto
 # github.com/prometheus/client_golang v1.23.2
 ## explicit; go 1.23.0
@@ -143,6 +166,9 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/quic-go/qpack v0.6.0
+## explicit; go 1.24
+github.com/quic-go/qpack
 # github.com/quic-go/quic-go v0.59.0
 ## explicit; go 1.24
 github.com/quic-go/quic-go
@@ -175,18 +201,6 @@ github.com/refraction-networking/utls/internal/quicvarint
 github.com/refraction-networking/utls/internal/quicvarint/protocol
 github.com/refraction-networking/utls/internal/tls12
 github.com/refraction-networking/utls/internal/tls13
-# github.com/sagernet/sing v0.5.1
-## explicit; go 1.20
-github.com/sagernet/sing/common
-github.com/sagernet/sing/common/atomic
-github.com/sagernet/sing/common/buf
-github.com/sagernet/sing/common/control
-github.com/sagernet/sing/common/debug
-github.com/sagernet/sing/common/exceptions
-github.com/sagernet/sing/common/format
-github.com/sagernet/sing/common/metadata
-github.com/sagernet/sing/common/network
-github.com/sagernet/sing/common/x/constraints
 # github.com/vishvananda/netlink v1.3.1
 ## explicit; go 1.12
 github.com/vishvananda/netlink
@@ -204,7 +218,7 @@ github.com/xtls/reality/fips140tls
 github.com/xtls/reality/hpke
 github.com/xtls/reality/tls12
 github.com/xtls/reality/tls13
-# github.com/xtls/xray-core v1.260327.0
+# github.com/xtls/xray-core v1.260327.1-0.20260507141325-1dbafe629a09
 ## explicit; go 1.26
 github.com/xtls/xray-core/common
 github.com/xtls/xray-core/common/bitmask
@@ -216,6 +230,8 @@ github.com/xtls/xray-core/common/crypto/internal
 github.com/xtls/xray-core/common/ctx
 github.com/xtls/xray-core/common/dice
 github.com/xtls/xray-core/common/errors
+github.com/xtls/xray-core/common/geodata
+github.com/xtls/xray-core/common/geodata/strmatcher
 github.com/xtls/xray-core/common/log
 github.com/xtls/xray-core/common/net
 github.com/xtls/xray-core/common/net/cnc
@@ -243,9 +259,16 @@ github.com/xtls/xray-core/features/policy
 github.com/xtls/xray-core/features/routing
 github.com/xtls/xray-core/features/stats
 github.com/xtls/xray-core/main/confloader
+github.com/xtls/xray-core/proxy/hysteria/account
 github.com/xtls/xray-core/transport
 github.com/xtls/xray-core/transport/internet
 github.com/xtls/xray-core/transport/internet/finalmask
+github.com/xtls/xray-core/transport/internet/hysteria
+github.com/xtls/xray-core/transport/internet/hysteria/congestion
+github.com/xtls/xray-core/transport/internet/hysteria/congestion/bbr
+github.com/xtls/xray-core/transport/internet/hysteria/congestion/brutal
+github.com/xtls/xray-core/transport/internet/hysteria/congestion/common
+github.com/xtls/xray-core/transport/internet/hysteria/udphop
 github.com/xtls/xray-core/transport/internet/reality
 github.com/xtls/xray-core/transport/internet/stat
 github.com/xtls/xray-core/transport/internet/tls
@@ -254,6 +277,9 @@ github.com/xtls/xray-core/transport/pipe
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
+# go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
+## explicit; go 1.18
+go4.org/netipx
 # golang.org/x/crypto v0.50.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/blake2b
@@ -270,6 +296,9 @@ golang.org/x/crypto/nacl/secretbox
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/sha3
+# golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
+## explicit; go 1.20
+golang.org/x/exp/constraints
 # golang.org/x/mod v0.34.0
 ## explicit; go 1.25.0
 golang.org/x/mod/semver
@@ -342,13 +371,13 @@ golang.zx2c4.com/wireguard/conn
 golang.zx2c4.com/wireguard/conn/winrio
 golang.zx2c4.com/wireguard/rwcancel
 golang.zx2c4.com/wireguard/tun
-# golang.zx2c4.com/wireguard/windows v0.5.3
-## explicit; go 1.18
+# golang.zx2c4.com/wireguard/windows v1.0.1
+## explicit; go 1.25.0
 golang.zx2c4.com/wireguard/windows/elevate
 golang.zx2c4.com/wireguard/windows/tunnel/winipcfg
 golang.zx2c4.com/wireguard/windows/version
-# google.golang.org/grpc v1.79.3
-## explicit; go 1.24.0
+# google.golang.org/grpc v1.81.0
+## explicit; go 1.25.0
 google.golang.org/grpc/attributes
 google.golang.org/grpc/credentials
 google.golang.org/grpc/grpclog
