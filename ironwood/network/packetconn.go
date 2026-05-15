@@ -19,7 +19,7 @@ func _type_asserts_() {
 type PacketConn struct {
 	actor        phony.Inbox
 	core         *core
-	recv         chan *traffic //read buffer
+	recv         chan *traffic // read buffer
 	recvReady    uint64
 	recvq        packetQueue
 	readDeadline *deadline

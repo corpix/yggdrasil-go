@@ -12,9 +12,11 @@ const (
 	signatureSize  = ed25519.SignatureSize
 )
 
-type publicKey [publicKeySize]byte
-type privateKey [privateKeySize]byte
-type signature [signatureSize]byte
+type (
+	publicKey  [publicKeySize]byte
+	privateKey [privateKeySize]byte
+	signature  [signatureSize]byte
+)
 
 type crypto struct {
 	privateKey privateKey

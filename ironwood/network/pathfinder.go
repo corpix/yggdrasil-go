@@ -69,12 +69,12 @@ func (pf *pathfinder) _handleLookup(fromKey publicKey, lookup *pathLookup) {
 			source:    pf.router.core.crypto.publicKey,
 			dest:      lookup.source,
 			info: pathNotifyInfo{
-				seq:  uint64(time.Now().Unix()), //pf.info.seq,
+				seq:  uint64(time.Now().Unix()), // pf.info.seq,
 				path: path,
 			},
 		}
 		if !pf.info.equal(notify.info) {
-			//notify.info.seq++
+			// notify.info.seq++
 			notify.info.sign(pf.router.core.crypto.privateKey)
 			pf.info = notify.info
 		} else {

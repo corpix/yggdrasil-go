@@ -399,7 +399,7 @@ func (info *sessionInfo) doRecv(from phony.Actor, msg []byte) {
 		case fromNext && toRecv:
 			// The remote side appears to have ratcheted forward early
 			// Technically there's no reason we can't handle this
-			//panic("DEBUG") // TODO test this
+			// panic("DEBUG") // TODO test this
 			if !(info.nextRecvNonce < nonce) {
 				return
 			}

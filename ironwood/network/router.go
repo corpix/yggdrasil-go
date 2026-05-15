@@ -136,7 +136,7 @@ func (r *router) _resetCache() {
 
 func (r *router) addPeer(from phony.Actor, p *peer) {
 	r.Act(from, func() {
-		//r._resetCache()
+		// r._resetCache()
 		if _, isIn := r.peers[p.key]; !isIn {
 			r.peers[p.key] = make(map[*peer]struct{})
 			r.sent[p.key] = make(map[publicKey]struct{})
@@ -166,7 +166,7 @@ func (r *router) addPeer(from phony.Actor, p *peer) {
 
 func (r *router) removePeer(from phony.Actor, p *peer) {
 	r.Act(from, func() {
-		//r._resetCache()
+		// r._resetCache()
 		ps := r.peers[p.key]
 		delete(ps, p)
 		r._recordDisconnect(p)
@@ -182,7 +182,7 @@ func (r *router) removePeer(from phony.Actor, p *peer) {
 			delete(r.ancs, p.key)
 			delete(r.cache, p.key)
 			r.blooms._removeInfo(p.key)
-			//r._fix()
+			// r._fix()
 		} else {
 			// The bloom the remote node is tracking could be wrong due to a race
 			// TODO? don't send it immediately, reset the "sent" state to blank so we'll resend next maintenance period
@@ -549,7 +549,7 @@ func (r *router) _handleResponse(p *peer, res *routerSigRes, rtt time.Duration) 
 		r.resSeqCtr++
 		r.resSeqs[p.key] = r.resSeqCtr
 		r.responses[p.key] = *res
-		//r._fix() // This could become our new parent
+		// r._fix() // This could become our new parent
 	}
 	if _, isIn := r.responded[p]; !isIn && r.requests[p.key] == res.routerSigReq {
 		r.responded[p] = struct{}{}
@@ -636,7 +636,7 @@ func (r *router) _update(ann *routerAnnounce) bool {
 			r.Act(nil, func() {
 				if r.timers[key] == timer {
 					r.refresh = true
-					//r._fix()
+					// r._fix()
 				}
 			})
 		})
@@ -651,7 +651,7 @@ func (r *router) _update(ann *routerAnnounce) bool {
 						delete(sent, key)
 					}
 					r._resetCache()
-					//r._fix()
+					// r._fix()
 				}
 			})
 		})
@@ -675,7 +675,7 @@ func (r *router) _handleAnnounce(p *peer, ann *routerAnnounce) {
 		}
 		// No point in sending this back to the original sender
 		r.sent[p.key][ann.key] = struct{}{}
-		//r._fix() // This could require us to change parents
+		// r._fix() // This could require us to change parents
 	} else {
 		// We didn't accept the info, because we alerady know it or something better
 		info := routerInfo{
@@ -832,7 +832,7 @@ func (r *router) _lookup(path []peerPort, watermark *uint64) *peer {
 	// Then take a look at the candidates and work out which is the best
 	// tree distance, accounting for the link cost.
 	bestPeer = nil
-	//selfDist := bestDist
+	// selfDist := bestDist
 	bestCost := ^uint64(0)
 	bestDist = ^uint64(0)
 	for _, p := range candidates {

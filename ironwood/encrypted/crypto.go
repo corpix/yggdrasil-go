@@ -39,9 +39,11 @@ const (
 	edSigSize  = 64
 )
 
-type edPub [edPubSize]byte
-type edPriv [edPrivSize]byte
-type edSig [edSigSize]byte
+type (
+	edPub  [edPubSize]byte
+	edPriv [edPrivSize]byte
+	edSig  [edSigSize]byte
+)
 
 func edSign(msg []byte, priv *edPriv) *edSig {
 	var sig edSig
@@ -90,10 +92,12 @@ const (
 	boxOverhead   = box.Overhead
 )
 
-type boxPub [boxPubSize]byte
-type boxPriv [boxPrivSize]byte
-type boxShared [boxSharedSize]byte
-type boxNonce [boxNonceSize]byte
+type (
+	boxPub    [boxPubSize]byte
+	boxPriv   [boxPrivSize]byte
+	boxShared [boxSharedSize]byte
+	boxNonce  [boxNonceSize]byte
+)
 
 func newBoxKeys() (pub boxPub, priv boxPriv) {
 	bpub, bpriv, err := box.GenerateKey(rand.Reader)

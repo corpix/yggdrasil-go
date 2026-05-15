@@ -405,7 +405,7 @@ func (p *peer) _handlePathNotify(bs []byte) error {
 }
 
 func (p *peer) sendPathNotify(from phony.Actor, notify *pathNotify) {
-	//p.sendDirect(from, wireProtoPathNotify, notify)
+	// p.sendDirect(from, wireProtoPathNotify, notify)
 	p.sendQueued(from, notify)
 }
 
@@ -419,7 +419,7 @@ func (p *peer) _handlePathBroken(bs []byte) error {
 }
 
 func (p *peer) sendPathBroken(from phony.Actor, broken *pathBroken) {
-	//p.sendDirect(from, wireProtoPathBroken, broken)
+	// p.sendDirect(from, wireProtoPathBroken, broken)
 	p.sendQueued(from, broken)
 }
 
