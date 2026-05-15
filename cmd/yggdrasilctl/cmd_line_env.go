@@ -14,9 +14,10 @@ import (
 )
 
 type CmdLineEnv struct {
-	args                 []string
-	endpoint, server     string
-	injson, borders, ver bool
+	args                        []string
+	endpoint, server            string
+	injson, borders, ver, verbose bool
+	state                       string
 }
 
 func newCmdLineEnv() CmdLineEnv {
@@ -46,6 +47,8 @@ func (cmdLineEnv *CmdLineEnv) parseFlagsAndArgs() {
 	injson := flag.Bool("json", false, "Output in JSON format (as opposed to pretty-print)")
 	borders := flag.Bool("borders", true, "Output borders on tables")
 	ver := flag.Bool("version", false, "Prints the version of this build")
+	verbose := flag.Bool("verbose", false, "Show last error column in getPeers output")
+	state := flag.String("state", "", "Filter getPeers by state: up|down (default: all)")
 
 	flag.Parse()
 
@@ -54,6 +57,8 @@ func (cmdLineEnv *CmdLineEnv) parseFlagsAndArgs() {
 	cmdLineEnv.injson = *injson
 	cmdLineEnv.borders = *borders
 	cmdLineEnv.ver = *ver
+	cmdLineEnv.verbose = *verbose
+	cmdLineEnv.state = *state
 }
 
 func (cmdLineEnv *CmdLineEnv) setEndpoint(logger *log.Logger) {

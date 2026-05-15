@@ -193,11 +193,26 @@ func run() int {
 		if err := json.Unmarshal(recv.Response, &resp); err != nil {
 			panic(err)
 		}
-		table.Header([]string{"URI", "State", "Dir", "Community", "Name", "IP Address", "Uptime", "RTT", "RX", "TX", "Down", "Up", "Pr", "Cost", "Last Error"})
+		stateFilter := strings.ToLower(cmdLineEnv.state)
+		if stateFilter != "" && stateFilter != "up" && stateFilter != "down" {
+			fmt.Fprintf(os.Stderr, "invalid -state value %q: must be up or down\n", cmdLineEnv.state)
+			return 1
+		}
+		headers := []string{"URI", "State", "Dir", "Community", "Name", "IP Address", "Uptime", "RTT", "RX", "TX", "Down", "Up", "Pr", "Cost"}
+		if cmdLineEnv.verbose {
+			headers = append(headers, "Last Error")
+		}
+		table.Header(headers)
 		for _, peer := range resp.Peers {
-			state, lasterr, dir, rtt, rxr, txr, name := "Up", "-", "Out", "-", "-", "-", "-"
+			if stateFilter == "up" && !peer.Up {
+				continue
+			}
+			if stateFilter == "down" && peer.Up {
+				continue
+			}
+			peerState, lasterr, dir, rtt, rxr, txr, name := "Up", "-", "Out", "-", "-", "-", "-"
 			if !peer.Up {
-				if state = "Down"; peer.LastError != "" {
+				if peerState = "Down"; peer.LastError != "" {
 					lasterr = fmt.Sprintf("%s ago: %s", peer.LastErrorTime.Round(time.Second), peer.LastError)
 				}
 			} else if rttms := float64(peer.Latency.Microseconds()) / 1000; rttms > 0 {
@@ -207,7 +222,6 @@ func run() int {
 				dir = "In"
 			}
 
-			// Extract name from NodeInfo if available
 			if peer.NodeInfo != "" {
 				var nodeInfo map[string]interface{}
 				if err := json.Unmarshal([]byte(peer.NodeInfo), &nodeInfo); err == nil {
@@ -230,9 +244,9 @@ func run() int {
 			if peer.TXRate > 0 {
 				txr = peer.TXRate.String() + "/s"
 			}
-			_ = table.Append([]string{
+			row := []string{
 				uristring,
-				state,
+				peerState,
 				dir,
 				peer.CommunityStatus,
 				name,
@@ -245,8 +259,11 @@ func run() int {
 				txr,
 				fmt.Sprintf("%d", peer.Priority),
 				fmt.Sprintf("%d", peer.Cost),
-				lasterr,
-			})
+			}
+			if cmdLineEnv.verbose {
+				row = append(row, lasterr)
+			}
+			_ = table.Append(row)
 		}
 		_ = table.Render()
 
