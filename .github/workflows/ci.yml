@@ -13,84 +13,65 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+      - run: nix develop .#devShells.x86_64-linux.default --command just lint
+      - run: nix develop .#devShells.x86_64-linux.default --command just fmt
+      - run: test ! -n "$(git status --porcelain)" || { git status --porcelain; git diff; exit 1; }
 
   codeql:
     name: Analyse
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+    runs-on: nix
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - name: Create CodeQL database
+        run: nix develop .#devShells.x86_64-linux.default --command codeql database create --language=go codeql-db
+
+      - name: Download CodeQL query packs
+        run: nix develop .#devShells.x86_64-linux.default --command codeql pack download codeql/go-queries
+
+      - name: Analyse CodeQL database
+        run: nix develop .#devShells.x86_64-linux.default --command codeql database analyze codeql-db codeql/go-queries --format=sarif-latest --output=go.sarif
+
+      - name: Upload SARIF results
+        uses: actions/upload-artifact@v3
         with:
-          languages: go
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+          name: codeql-sarif
+          path: go.sarif
 
   build-linux:
-    strategy:
-      fail-fast: false
-      matrix:
-        goversion: ["1.26"]
-
-    name: Build & Test (Linux, Go ${{ matrix.goversion }})
+    name: Build & Test (Linux)
     needs: [lint]
-
-    runs-on: ubuntu-latest
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ matrix.goversion }}
-
       - name: Build Yggdrasil
-        run: go build -v ./...
+        run: nix develop .#devShells.x86_64-linux.default --command go build -v ./...
 
       - name: Unit tests
-        run: go test -v ./...
+        run: nix develop .#devShells.x86_64-linux.default --command go test -v ./...
 
   build-freebsd:
     strategy:
       fail-fast: false
       matrix:
-        goversion: ["1.26"]
         goos:
           - freebsd
           - openbsd
 
-    name: Build (Cross ${{ matrix.goos }}, Go ${{ matrix.goversion }})
+    name: Build (Cross ${{ matrix.goos }})
     needs: [lint]
-
-    runs-on: ubuntu-latest
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ matrix.goversion }}
-
       - name: Build Yggdrasil
-        run: go build -v ./...
+        run: nix develop .#devShells.x86_64-linux.default --command go build -v ./...
         env:
           GOOS: ${{ matrix.goos }}
+          CGO_ENABLED: "0"

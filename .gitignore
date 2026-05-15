@@ -3,3 +3,4 @@
 /yggdrasilctl
 /yggdrasil.*
 *.log
+/build

@@ -10,28 +10,24 @@ concurrency:
 jobs:
   build-vendored-sources:
     name: Vendored Sources
-
-    runs-on: ubuntu-latest
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
+      - name: Vendor dependencies
+        run: nix develop .#devShells.x86_64-linux.default --command go mod vendor
 
       - name: Build archive
         run: |
-          NAME="$(sh contrib/semver/name.sh)"
-          VERSION="$(sh contrib/semver/version.sh --bare)"
-          go mod vendor && tar --exclude-vcs --no-xattrs \
-            --exclude="${NAME}-${VERSION}-vendored.tar.gz" \
-            -czf "${NAME}-${VERSION}-vendored.tar.gz" *
+          NAME="$(nix develop .#devShells.x86_64-linux.default --command just pkgname)"
+          VERSION="$(nix develop .#devShells.x86_64-linux.default --command just pkgversion)"
+          tar --exclude-vcs --no-xattrs -czf "/tmp/${NAME}-${VERSION}-vendored.tar.gz" .
+          mv "/tmp/${NAME}-${VERSION}-vendored.tar.gz" .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: Vendored sources
           path: "*.tar.gz"
@@ -44,63 +40,65 @@ jobs:
         pkgarch: ["amd64", "i386", "mips", "mipsel", "armhf", "armel", "arm64"]
 
     name: Package (Debian, ${{ matrix.pkgarch }})
-
-    runs-on: ubuntu-latest
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
-
       - name: Build package
-        env:
-          PKGARCH: ${{ matrix.pkgarch }}
-        run: sh contrib/deb/generate.sh
+        run: nix develop .#devShells.x86_64-linux.default --command just build-debian ${{ matrix.pkgarch }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: Debian package (${{ matrix.pkgarch }})
-          path: "*.deb"
+          path: "build/*.deb"
           if-no-files-found: error
 
-  build-packages-router:
+  build-packages-macos:
     strategy:
       fail-fast: false
       matrix:
-        pkgarch: ["edgerouter-x", "edgerouter-lite", "vyos-amd64", "vyos-i386"]
+        pkgarch: ["amd64", "arm64"]
 
-    name: Package (Router, ${{ matrix.pkgarch }})
-
-    runs-on: ubuntu-latest
+    name: Package (macOS, ${{ matrix.pkgarch }})
+    runs-on: nix
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          path: yggdrasil
-
-      - uses: actions/checkout@v6
-        with:
-          repository: neilalexander/vyatta-yggdrasil
-          path: vyatta-yggdrasil
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
 
       - name: Build package
-        env:
-          BUILDDIR_YGG: /home/runner/work/yggdrasil-go/yggdrasil-go/yggdrasil
-        run: cd /home/runner/work/yggdrasil-go/yggdrasil-go/vyatta-yggdrasil && ./build-${{ matrix.pkgarch }}
+        run: nix develop .#devShells.x86_64-linux.default --command just build-macos ${{ matrix.pkgarch }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: Router package (${{ matrix.pkgarch }})
-          path: "/home/runner/work/yggdrasil-go/yggdrasil-go/vyatta-yggdrasil/*.deb"
+          name: macOS package (${{ matrix.pkgarch }})
+          path: "build/*.pkg"
           if-no-files-found: error
+
+  build-packages-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        pkgarch: ["x64", "x86"] # todo: arm64 support (requires wix update)
+
+    name: Package (Windows, ${{ matrix.pkgarch }})
+    runs-on: nix
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Build package
+        run: nix develop .#devShells.x86_64-linux.default --command just build-windows ${{ matrix.pkgarch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Windows package (${{ matrix.pkgarch }})
+          path: "build/*.msi"
+          if-no-files-found: error
+
