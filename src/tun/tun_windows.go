@@ -9,8 +9,9 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 	"golang.org/x/sys/windows"
+
+	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 
 	"golang.zx2c4.com/wintun"
 	wgtun "golang.zx2c4.com/wireguard/tun"

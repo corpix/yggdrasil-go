@@ -6,13 +6,16 @@ import (
 	"strings"
 
 	"github.com/Arceliar/phony"
+
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 )
 
-type GetMulticastInterfacesRequest struct{}
-type GetMulticastInterfacesResponse struct {
-	Interfaces []MulticastInterfaceState `json:"multicast_interfaces"`
-}
+type (
+	GetMulticastInterfacesRequest  struct{}
+	GetMulticastInterfacesResponse struct {
+		Interfaces []MulticastInterfaceState `json:"multicast_interfaces"`
+	}
+)
 
 type MulticastInterfaceState struct {
 	Name     string `json:"name"`

@@ -18,8 +18,9 @@ import (
 	"time"
 
 	"github.com/Arceliar/phony"
-	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"golang.org/x/crypto/blake2b"
+
+	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 )
 
 type linkType int
@@ -30,8 +31,10 @@ const (
 	linkTypeIncoming                   // Incoming connection
 )
 
-const defaultBackoffLimit = time.Second << 12 // 1h8m16s
-const minimumBackoffLimit = time.Second * 5
+const (
+	defaultBackoffLimit = time.Second << 12 // 1h8m16s
+	minimumBackoffLimit = time.Second * 5
+)
 
 type links struct {
 	phony.Inbox
@@ -156,16 +159,18 @@ type linkError string
 
 func (e linkError) Error() string { return string(e) }
 
-const ErrLinkAlreadyConfigured = linkError("peer is already configured")
-const ErrLinkNotConfigured = linkError("peer is not configured")
-const ErrLinkPriorityInvalid = linkError("priority value is invalid")
-const ErrLinkPinnedKeyInvalid = linkError("pinned public key is invalid")
-const ErrLinkPasswordInvalid = linkError("invalid password supplied")
-const ErrLinkUnrecognisedSchema = linkError("link schema unknown")
-const ErrLinkMaxBackoffInvalid = linkError("max backoff duration invalid")
-const ErrLinkSNINotSupported = linkError("SNI not supported on this link type")
-const ErrLinkNoSuitableIPs = linkError("peer has no suitable addresses")
-const ErrLinkToSelf = linkError("node cannot connect to self")
+const (
+	ErrLinkAlreadyConfigured  = linkError("peer is already configured")
+	ErrLinkNotConfigured      = linkError("peer is not configured")
+	ErrLinkPriorityInvalid    = linkError("priority value is invalid")
+	ErrLinkPinnedKeyInvalid   = linkError("pinned public key is invalid")
+	ErrLinkPasswordInvalid    = linkError("invalid password supplied")
+	ErrLinkUnrecognisedSchema = linkError("link schema unknown")
+	ErrLinkMaxBackoffInvalid  = linkError("max backoff duration invalid")
+	ErrLinkSNINotSupported    = linkError("SNI not supported on this link type")
+	ErrLinkNoSuitableIPs      = linkError("peer has no suitable addresses")
+	ErrLinkToSelf             = linkError("node cannot connect to self")
+)
 
 func (l *links) add(u *url.URL, sintf string, linkType linkType) error {
 	if _, err := l.dialerFor(u); err != nil {

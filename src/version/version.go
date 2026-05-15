@@ -1,7 +1,9 @@
 package version
 
-var buildName string
-var buildVersion string
+var (
+	buildName    string
+	buildVersion string
+)
 
 // BuildName gets the current build name. This is usually injected if built
 // from git, or returns "unknown" otherwise.

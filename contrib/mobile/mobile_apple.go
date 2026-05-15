@@ -12,14 +12,14 @@ void Log(const char *text) {
 }
 */
 import "C"
+
 import (
 	"unsafe"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/tun"
 )
 
-type MobileLogger struct {
-}
+type MobileLogger struct{}
 
 func (nsl MobileLogger) Write(p []byte) (n int, err error) {
 	p = append(p, 0)

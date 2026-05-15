@@ -20,7 +20,7 @@ func TestStaticFiles_DevMode_ServeFile(t *testing.T) {
 	// Create temporary test files
 	tempDir := t.TempDir()
 	staticDir := filepath.Join(tempDir, "src", "webui", "static")
-	err := os.MkdirAll(staticDir, 0755)
+	err := os.MkdirAll(staticDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp static dir: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestStaticFiles_DevMode_ServeFile(t *testing.T) {
 
 	for filename, content := range testFiles {
 		filePath := filepath.Join(staticDir, filename)
-		err := os.WriteFile(filePath, []byte(content), 0644)
+		err := os.WriteFile(filePath, []byte(content), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
@@ -101,7 +101,7 @@ func TestStaticFiles_DevMode_SetupStaticHandler(t *testing.T) {
 	// Create temporary test files for static handler testing
 	tempDir := t.TempDir()
 	staticDir := filepath.Join(tempDir, "src", "webui", "static")
-	err := os.MkdirAll(staticDir, 0755)
+	err := os.MkdirAll(staticDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp static dir: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestStaticFiles_DevMode_SetupStaticHandler(t *testing.T) {
 	// Create test CSS file
 	cssContent := "body { color: blue; }"
 	cssPath := filepath.Join(staticDir, "test.css")
-	err = os.WriteFile(cssPath, []byte(cssContent), 0644)
+	err = os.WriteFile(cssPath, []byte(cssContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test CSS file: %v", err)
 	}
@@ -167,14 +167,14 @@ func TestStaticFiles_DevMode_PathTraversal(t *testing.T) {
 	// Create temporary test setup
 	tempDir := t.TempDir()
 	staticDir := filepath.Join(tempDir, "src", "webui", "static")
-	err := os.MkdirAll(staticDir, 0755)
+	err := os.MkdirAll(staticDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp static dir: %v", err)
 	}
 
 	// Create a sensitive file outside static directory
 	sensitiveFile := filepath.Join(tempDir, "sensitive.txt")
-	err = os.WriteFile(sensitiveFile, []byte("sensitive data"), 0644)
+	err = os.WriteFile(sensitiveFile, []byte("sensitive data"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create sensitive file: %v", err)
 	}
@@ -227,14 +227,14 @@ func TestStaticFiles_DevMode_EmptyPath(t *testing.T) {
 	// Create temporary test setup with index.html
 	tempDir := t.TempDir()
 	staticDir := filepath.Join(tempDir, "src", "webui", "static")
-	err := os.MkdirAll(staticDir, 0755)
+	err := os.MkdirAll(staticDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp static dir: %v", err)
 	}
 
 	indexContent := "<html><body>Index Page</body></html>"
 	indexPath := filepath.Join(staticDir, "index.html")
-	err = os.WriteFile(indexPath, []byte(indexContent), 0644)
+	err = os.WriteFile(indexPath, []byte(indexContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create index.html: %v", err)
 	}

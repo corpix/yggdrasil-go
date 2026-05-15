@@ -55,13 +55,15 @@ type handshakeError string
 
 func (e handshakeError) Error() string { return string(e) }
 
-const ErrHandshakeInvalidPreamble = handshakeError("invalid handshake, remote side is not Yggdrasil")
-const ErrHandshakeInvalidLength = handshakeError("invalid handshake length, possible version mismatch")
-const ErrHandshakeInvalidPassword = handshakeError("invalid password supplied, check your config")
-const ErrHandshakeHashFailure = handshakeError("invalid hash length")
-const ErrHandshakeIncorrectPassword = handshakeError("password does not match remote side")
-const ErrHandshakeCommunityRequired = handshakeError("remote node does not support the community feature")
-const ErrHandshakeCommunityMismatch = handshakeError("community string does not match remote node")
+const (
+	ErrHandshakeInvalidPreamble   = handshakeError("invalid handshake, remote side is not Yggdrasil")
+	ErrHandshakeInvalidLength     = handshakeError("invalid handshake length, possible version mismatch")
+	ErrHandshakeInvalidPassword   = handshakeError("invalid password supplied, check your config")
+	ErrHandshakeHashFailure       = handshakeError("invalid hash length")
+	ErrHandshakeIncorrectPassword = handshakeError("password does not match remote side")
+	ErrHandshakeCommunityRequired = handshakeError("remote node does not support the community feature")
+	ErrHandshakeCommunityMismatch = handshakeError("community string does not match remote node")
+)
 
 // Gets a base metadata with no keys set, but with the correct version numbers.
 func version_getBaseMetadata() version_metadata {

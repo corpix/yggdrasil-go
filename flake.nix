@@ -31,7 +31,7 @@
           git
           jq yq-go hjson-go
           gcc pkg-config gnumake just
-          go gopls delve golangci-lint gofumpt
+          go gopls delve golangci-lint gofumpt gotools
           python3
           openssl netcat
           gettext

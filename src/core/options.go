@@ -56,18 +56,23 @@ type SetupOption interface {
 	isSetupOption()
 }
 
-type ListenAddress string
-type Peer struct {
-	URI             string
-	SourceInterface string
-}
-type NodeInfo map[string]interface{}
-type NodeInfoPrivacy bool
-type AllowedPublicKey ed25519.PublicKey
-type PeerFilter func(net.IP) bool
-type OutboundSNIList []string
-type Community []byte
-type CommunityMode string
+type (
+	ListenAddress string
+	Peer          struct {
+		URI             string
+		SourceInterface string
+	}
+)
+
+type (
+	NodeInfo         map[string]interface{}
+	NodeInfoPrivacy  bool
+	AllowedPublicKey ed25519.PublicKey
+	PeerFilter       func(net.IP) bool
+	OutboundSNIList  []string
+	Community        []byte
+	CommunityMode    string
+)
 
 const (
 	CommunityModeStrict CommunityMode = "strict"

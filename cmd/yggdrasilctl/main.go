@@ -18,6 +18,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
+
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -279,8 +280,8 @@ func run() int {
 				tree.IPAddress,
 				tree.Parent,
 				fmt.Sprintf("%d", tree.Sequence),
-				//fmt.Sprintf("%d", dht.Port),
-				//fmt.Sprintf("%d", dht.Rest),
+				// fmt.Sprintf("%d", dht.Port),
+				// fmt.Sprintf("%d", dht.Rest),
 			})
 		}
 		_ = table.Render()

@@ -83,7 +83,7 @@ func AddrForKey(publicKey ed25519.PublicKey) *Address {
 		buf[idx] = ^buf[idx]
 	}
 	var addr Address
-	var temp = make([]byte, 0, 32)
+	temp := make([]byte, 0, 32)
 	done := false
 	ones := byte(0)
 	bits := byte(0)

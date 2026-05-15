@@ -80,7 +80,7 @@ func main() {
 		}
 
 	default:
-		if logfd, err := os.OpenFile(*logto, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		if logfd, err := os.OpenFile(*logto, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
 			logger = log.New(logfd, "", log.Flags())
 		}
 	}
@@ -343,7 +343,7 @@ func main() {
 		}()
 	}
 
-	//Windows service shutdown
+	// Windows service shutdown
 	minwinsvc.SetOnExit(func() {
 		logger.Infof("Shutting down service ...")
 		cancel()

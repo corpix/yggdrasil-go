@@ -12,11 +12,14 @@ import (
 	"os"
 
 	"github.com/cheggaaa/pb/v3"
+
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 )
 
-var numHosts = flag.Int("hosts", 1, "number of host vars to generate")
-var keyTries = flag.Int("tries", 1000, "number of tries before taking the best keys")
+var (
+	numHosts = flag.Int("hosts", 1, "number of host vars to generate")
+	keyTries = flag.Int("tries", 1000, "number of tries before taking the best keys")
+)
 
 type keySet struct {
 	priv []byte
@@ -46,10 +49,10 @@ func main() {
 		bar.Increment()
 	}
 
-	os.MkdirAll("host_vars", 0755)
+	os.MkdirAll("host_vars", 0o755)
 
 	for i := 1; i <= *numHosts; i++ {
-		os.MkdirAll(fmt.Sprintf("host_vars/%x", i), 0755)
+		os.MkdirAll(fmt.Sprintf("host_vars/%x", i), 0o755)
 		file, err := os.Create(fmt.Sprintf("host_vars/%x/vars", i))
 		if err != nil {
 			return
@@ -101,7 +104,7 @@ func sortKeySetArray(sets []keySet) []keySet {
 func bubbleUpTo(sets []keySet, num int) []keySet {
 	for i := 0; i < len(sets)-num-1; i++ {
 		if isBetter(sets[i+1].pub, sets[i].pub) {
-			var tmp = sets[i]
+			tmp := sets[i]
 			sets[i] = sets[i+1]
 			sets[i+1] = tmp
 		} else {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gologme/log"
+
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 

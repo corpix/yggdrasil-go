@@ -15,9 +15,11 @@ type SetupOption interface {
 	isSetupOption()
 }
 
-type InterfaceName string
-type InterfaceMTU uint64
-type FileDescriptor int32
+type (
+	InterfaceName  string
+	InterfaceMTU   uint64
+	FileDescriptor int32
+)
 
 func (a InterfaceName) isSetupOption()  {}
 func (a InterfaceMTU) isSetupOption()   {}

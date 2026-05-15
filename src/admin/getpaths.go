@@ -9,8 +9,7 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 )
 
-type GetPathsRequest struct {
-}
+type GetPathsRequest struct{}
 
 type GetPathsResponse struct {
 	Paths []PathEntry `json:"paths"`

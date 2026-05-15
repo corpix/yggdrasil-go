@@ -48,6 +48,13 @@ build debug="0" race="0" pie="0" tables="0" upx="0" output="" ldflags="" gcflags
       fi
     done
 
+lint:
+  golangci-lint run -v
+
+fmt:
+  gofumpt -w ./
+  goimports -format-only -local github.com/yggdrasil-network/ -w ./src ./cmd ./contrib
+
 # Destructive clean
 clean:
   git clean -dxf

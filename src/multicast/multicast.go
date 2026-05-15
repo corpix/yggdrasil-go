@@ -15,9 +15,10 @@ import (
 	"github.com/Arceliar/phony"
 	"github.com/wlynxg/anet"
 
-	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/net/ipv6"
+
+	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 )
 
 // Multicast represents the multicast advertisement and discovery mechanism used

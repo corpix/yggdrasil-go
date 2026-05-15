@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"sort"
-
 	"strings"
 	"time"
 
@@ -127,7 +126,7 @@ func New(c *core.Core, log core.Logger, opts ...SetupOption) (*AdminSocket, erro
 			if err == nil {
 				abstract := u.Path != "" && u.Path[0] == '@'
 				if !abstract {
-					if err := os.Chmod(u.Path, 0660); err != nil {
+					if err := os.Chmod(u.Path, 0o660); err != nil {
 						a.log.Warnln("WARNING:", u.Path, "may have unsafe permissions!")
 					}
 				}

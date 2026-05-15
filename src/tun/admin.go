@@ -6,12 +6,14 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 )
 
-type GetTUNRequest struct{}
-type GetTUNResponse struct {
-	Enabled bool   `json:"enabled"`
-	Name    string `json:"name,omitempty"`
-	MTU     uint64 `json:"mtu,omitempty"`
-}
+type (
+	GetTUNRequest  struct{}
+	GetTUNResponse struct {
+		Enabled bool   `json:"enabled"`
+		Name    string `json:"name,omitempty"`
+		MTU     uint64 `json:"mtu,omitempty"`
+	}
+)
 
 type TUNEntry struct {
 	MTU uint64 `json:"mtu"`

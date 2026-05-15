@@ -11,6 +11,7 @@ import (
 	"github.com/Arceliar/phony"
 
 	"github.com/Arceliar/ironwood/network"
+
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 )
 
@@ -46,8 +47,8 @@ type TreeEntryInfo struct {
 	Key      ed25519.PublicKey
 	Parent   ed25519.PublicKey
 	Sequence uint64
-	//Port uint64
-	//Rest uint64
+	// Port uint64
+	// Rest uint64
 }
 
 type PathEntryInfo struct {
@@ -125,8 +126,8 @@ func (c *Core) GetTree() []TreeEntryInfo {
 		info.Key = t.Key
 		info.Parent = t.Parent
 		info.Sequence = t.Sequence
-		//info.Port = d.Port
-		//info.Rest = d.Rest
+		// info.Port = d.Port
+		// info.Rest = d.Rest
 		trees = append(trees, info)
 	}
 	return trees

@@ -455,7 +455,7 @@ func SaveConfig(configData interface{}, configPath, format string) error {
 	}
 
 	dir := filepath.Clean(filepath.Dir(targetPath))
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %v", err)
 	}
 
@@ -472,7 +472,7 @@ func SaveConfig(configData interface{}, configPath, format string) error {
 		}
 	}
 
-	if err := os.WriteFile(targetPath, outputData, 0600); err != nil {
+	if err := os.WriteFile(targetPath, outputData, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
