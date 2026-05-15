@@ -14,10 +14,10 @@ import (
 )
 
 type CmdLineEnv struct {
-	args                        []string
-	endpoint, server            string
+	args                          []string
+	endpoint, server              string
 	injson, borders, ver, verbose bool
-	state                       string
+	state                         string
 }
 
 func newCmdLineEnv() CmdLineEnv {

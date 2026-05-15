@@ -306,7 +306,8 @@ func TestWebUIServer_LargeNumberOfRequests(t *testing.T) {
 
 	// Use httptest.Server for more reliable testing
 	mux := http.NewServeMux()
-	testServer := Server("127.0.0.1:0", "", createTestLogger()); setupStaticHandler(mux, testServer)
+	testServer := Server("127.0.0.1:0", "", createTestLogger())
+	setupStaticHandler(mux, testServer)
 	mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 		serveFile(rw, r, logger)
 	})

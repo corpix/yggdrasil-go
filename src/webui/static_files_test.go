@@ -128,7 +128,8 @@ func TestStaticFiles_DevMode_SetupStaticHandler(t *testing.T) {
 
 	// Create HTTP server with static handler
 	mux := http.NewServeMux()
-	testServer := Server("127.0.0.1:0", "", createTestLogger()); setupStaticHandler(mux, testServer)
+	testServer := Server("127.0.0.1:0", "", createTestLogger())
+	setupStaticHandler(mux, testServer)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
