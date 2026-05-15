@@ -195,11 +195,12 @@ func TestWebUIConfig_HostFormats(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			var listenAddr string
 
-			if test.host == "" {
+			switch test.host {
+			case "":
 				listenAddr = fmt.Sprintf(":%d", test.port)
-			} else if test.host == "::1" || test.host == "::" {
+			case "::1", "::":
 				listenAddr = fmt.Sprintf("[%s]:%d", test.host, test.port)
-			} else {
+			default:
 				listenAddr = fmt.Sprintf("%s:%d", test.host, test.port)
 			}
 

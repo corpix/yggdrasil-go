@@ -425,7 +425,7 @@ func (w *WebUIServer) setConfigHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	configInfo, err := config.GetCurrentConfig()
-	var configPath string = req.ConfigPath
+	configPath := req.ConfigPath
 	if err == nil && configInfo != nil {
 		configPath = configInfo.Path
 	}
