@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	filippo.io/edwards25519 v1.2.0
-	github.com/Arceliar/ironwood v0.0.0-20260117132459-7017dbc41d8e
+	github.com/Arceliar/ironwood v0.0.0-00010101000000-000000000000
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
 	github.com/apernet/quic-go v0.59.1-0.20260425001925-6c6cc9bcb716
 	github.com/cheggaaa/pb/v3 v3.1.7
@@ -61,6 +61,8 @@ require (
 	google.golang.org/grpc v1.81.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace github.com/Arceliar/ironwood => ./ironwood
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect

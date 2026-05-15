@@ -2,8 +2,8 @@
 ## explicit; go 1.24.0
 filippo.io/edwards25519
 filippo.io/edwards25519/field
-# github.com/Arceliar/ironwood v0.0.0-20260117132459-7017dbc41d8e
-## explicit; go 1.21
+# github.com/Arceliar/ironwood v0.0.0-00010101000000-000000000000 => ./ironwood
+## explicit; go 1.26
 github.com/Arceliar/ironwood/encrypted
 github.com/Arceliar/ironwood/encrypted/internal/e2c
 github.com/Arceliar/ironwood/network
@@ -418,3 +418,4 @@ google.golang.org/protobuf/types/known/timestamppb
 # suah.dev/protect v1.2.4
 ## explicit; go 1.14
 suah.dev/protect
+# github.com/Arceliar/ironwood => ./ironwood
