@@ -43,6 +43,18 @@ type node struct {
 	webui     *webui.WebUIServer
 }
 
+func saveNormalisedConfigFile(cfg *config.NodeConfig, configPath string, confjson bool) error {
+	cfg.AdminListen = ""
+	if cfg.PrivateKeyPath != "" {
+		cfg.PrivateKey = nil
+	}
+	format := "hjson"
+	if confjson {
+		format = "json"
+	}
+	return config.SaveConfig(cfg, configPath, format)
+}
+
 // The main function is responsible for configuring and starting Yggdrasil.
 func main() {
 	genconf := flag.Bool("genconf", false, "print a new config to stdout")
@@ -116,6 +128,12 @@ func main() {
 		configPath = *useconffile
 		f, err := os.Open(*useconffile)
 		if err != nil {
+			if os.IsNotExist(err) && *normaliseconf {
+				if err := saveNormalisedConfigFile(cfg, configPath, *confjson); err != nil {
+					panic(err)
+				}
+				break
+			}
 			panic(err)
 		}
 		if _, err := cfg.ReadFrom(f); err != nil {
