@@ -1,6 +1,7 @@
 # Yggdrasil
 
-[![Build status](https://github.com/yggdrasil-network/yggdrasil-go/actions/workflows/ci.yml/badge.svg)](https://github.com/yggdrasil-network/yggdrasil-go/actions/workflows/ci.yml)
+> This repository is an attempt on patching original Yggdrasil with some
+> DPI resistance.
 
 ## Introduction
 
@@ -8,88 +9,120 @@ Yggdrasil is an early-stage implementation of a fully end-to-end encrypted IPv6
 network. It is lightweight, self-arranging, supported on multiple platforms and
 allows pretty much any IPv6-capable application to communicate securely with
 other Yggdrasil nodes. Yggdrasil does not require you to have IPv6 Internet
-connectivity - it also works over IPv4.
+connectivity, it also works over IPv4.
 
-## Supported Platforms
+## Features
 
-Yggdrasil works on a number of platforms, including Linux, macOS, Ubiquiti
-EdgeRouter, VyOS, Windows, FreeBSD, OpenBSD and OpenWrt.
+* End-to-end encrypted IPv6 mesh routing in the `200::/7` range, with a TUN
+  interface exposed to the host so any IPv6-capable application can use it.
+* Multicast peer discovery on local networks, optionally password-protected
+  per interface.
+* A range of peer transports:
+  * `xray+reality://` X-Ray REALITY, which makes the peering look like a real
+    TLS handshake to an arbitrary destination (`?sni=`, `?dest=host:443`).
+  * `xray+hysteria://` X-Ray Hysteria over QUIC with a shared password and
+    SNI, for high-loss or DPI-heavy environments.
+  * `tls://` TCP wrapped in TLS, with an optional `?sni=` to set the SNI
+    presented to middleboxes. `OutboundSNIList` provides sticky per-peer
+    SNI rotation when a peer does not specify one explicitly.
+  * `quic://` QUIC, useful on lossy links.
+  * `ws://` and `wss://` WebSocket, with a configurable `origin=` query
+    option (repeatable, `origin=*` to disable verification) so browser
+    clients can dial a public peer.
+  * `socks://` and `sockstls://` outbound peering via a SOCKS proxy.
+  * `tcp://` plain TCP.
+  * `unix://` Unix domain sockets, including relative paths.
+* Private networks via a shared `Community` string. The string is never sent
+  in plaintext, it is mixed into handshake key material so peers without the
+  matching community cannot complete the handshake. `CommunityMode` chooses
+  between `strict` (both sides must support communities) and `soft` (allow
+  outbound to legacy peers, reject inbound mismatches). The private network
+  IPv6 prefix is configurable.
+* Built-in Prometheus exporter (`PrometheusEnabled`, `PrometheusListen`,
+  default `127.0.0.1:9756`) for scraping peer, link and routing metrics.
+* Optional web UI (`WebUI.Enable`, `WebUI.Host`, `WebUI.Port`) for managing
+  the node from a browser.
+* `yggdrasilctl` for live introspection and control over the admin socket,
+  with `-verbose` to show the last error per peer and `-state up|down` to
+  filter `getPeers` by link state. 
+* `-normaliseconf` creates the target config file if it does not yet exist,
+  which makes it usable as a one-shot config migrator.
+* In-tree `ironwood` routing layer with a disconnect penalty in peer-cost
+  calculation, which produces more stable routes when links flap.
 
-Please see our [Installation](https://yggdrasil-network.github.io/installation.html)
-page for more information. You may also find other platform-specific wrappers, scripts
-or tools in the `contrib` folder.
+Example configurations live in the repo root: `test.sni.conf`,
+`test.webui.conf`, `test.xray-reality.conf`, `test.xray-hysteria.conf`.
 
 ## Building
 
-If you want to build from source, as opposed to installing one of the pre-built
-packages:
+If you would rather build from source than install a pre-built package:
 
-1. Install [Go](https://golang.org) (requires Go 1.22 or later)
-2. Clone this repository
-2. Run `./build`
+1. Install [Go](https://golang.org). Version 1.26 or later is required.
+2. Clone this repository.
+3. Run `just build`.
 
-Note that you can cross-compile for other platforms and architectures by
-specifying the `GOOS` and `GOARCH` environment variables, e.g. `GOOS=windows
-./build` or `GOOS=linux GOARCH=mipsle ./build`.
+`just build` accepts a handful of switches:
+
+- `debug=1`
+- `race=1`
+- `pie=1`
+- `upx=1`
+- `output=...`
+- `ldflags=...`
+- `gcflags=...`
+
+Native package builds:
+
+- `just build-debian`
+- `just build-macos`
+- `just build-windows`
+
+To cross-compile, set `GOOS` and `GOARCH` as usual, e.g.
+`GOOS=windows just build` or `GOOS=linux GOARCH=mipsle just build`.
 
 ## Running
 
 ### Generate configuration
 
-To generate static configuration, either generate a HJSON file (human-friendly,
-complete with comments):
+Generate an HJSON file (human-friendly, with comments):
 
 ```
 ./yggdrasil -genconf > /path/to/yggdrasil.conf
 ```
 
-... or generate a plain JSON file (which is easy to manipulate
-programmatically):
+Or a plain JSON file (easier to manipulate programmatically):
 
 ```
 ./yggdrasil -genconf -json > /path/to/yggdrasil.conf
 ```
 
-You will need to edit the `yggdrasil.conf` file to add or remove peers, modify
-other configuration such as listen addresses or multicast addresses, etc.
+Edit `yggdrasil.conf` to add or remove peers, change listen or multicast
+addresses, set up a `Community`, enable Prometheus or the web UI, and so on.
 
 ### Run Yggdrasil
 
-To run with the generated static configuration:
+With a static config:
 
 ```
 ./yggdrasil -useconffile /path/to/yggdrasil.conf
 ```
 
-To run in auto-configuration mode (which will use sane defaults and random keys
-at each startup, instead of using a static configuration file):
+Or in auto-configuration mode, which uses sane defaults and fresh random keys
+on every startup:
 
 ```
 ./yggdrasil -autoconf
 ```
 
-You will likely need to run Yggdrasil as a privileged user or under `sudo`,
-unless you have permission to create TUN/TAP adapters. On Linux this can be done
-by giving the Yggdrasil binary the `CAP_NET_ADMIN` capability.
-
-## Documentation
-
-Documentation is available [on our website](https://yggdrasil-network.github.io).
-
-- [Installing Yggdrasil](https://yggdrasil-network.github.io/installation.html)
-- [Configuring Yggdrasil](https://yggdrasil-network.github.io/configuration.html)
-- [Frequently asked questions](https://yggdrasil-network.github.io/faq.html)
-- [Version changelog](CHANGELOG.md)
-
-## Communities
-
-A number of IRC communities exist, including the `#yggdrasil` IRC channel on [libera.chat](https://libera.chat) and various others on [Yggdrasil-internal IRC networks](https://yggdrasil-network.github.io/services.html#irc).
+You will typically need to run as root or under `sudo` so yggdrasil can create
+the TUN adapter. On Linux you can avoid that by giving the binary the
+`CAP_NET_ADMIN` capability instead.
 
 ## License
 
-This code is released under the terms of the LGPLv3, but with an added exception
-that was shamelessly taken from [godeb](https://github.com/niemeyer/godeb).
-Under certain circumstances, this exception permits distribution of binaries
-that are (statically or dynamically) linked with this code, without requiring
-the distribution of Minimal Corresponding Source or Minimal Application Code.
-For more details, see: [LICENSE](LICENSE).
+This code is released under the terms of the LGPLv3, with an added exception
+shamelessly borrowed from [godeb](https://github.com/niemeyer/godeb). Under
+certain circumstances that exception permits distribution of binaries
+statically or dynamically linked with this code without requiring distribution
+of Minimal Corresponding Source or Minimal Application Code. See
+[LICENSE](LICENSE) for the details.
