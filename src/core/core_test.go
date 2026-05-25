@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
@@ -203,6 +204,24 @@ func CreateEchoListener(t testing.TB, nodeA *Core, bufLen int, repeats int) chan
 // TestCore_Start_Connect checks if two nodes can connect together.
 func TestCore_Start_Connect(t *testing.T) {
 	CreateAndConnectTwo(t, true)
+}
+
+func TestCore_GetPeersIncludesHandshakeNodeInfo(t *testing.T) {
+	nodeA, nodeB, peerURL := createNodePair(t, []SetupOption{
+		NodeInfo(map[string]interface{}{"name": "node-a"}),
+	}, nil)
+	defer nodeA.Stop()
+	defer nodeB.Stop()
+
+	require_NoError(t, nodeB.AddPeer(peerURL, ""))
+
+	peer := waitForPersistentPeer(t, nodeB, func(peer PeerInfo) bool {
+		return peer.Up && len(peer.NodeInfo) > 0
+	})
+
+	var nodeInfo map[string]interface{}
+	require_NoError(t, json.Unmarshal(peer.NodeInfo, &nodeInfo))
+	require_Equal(t, nodeInfo["name"], "node-a")
 }
 
 // TestCore_Start_Transfer checks that messages can be passed between nodes (in both directions).

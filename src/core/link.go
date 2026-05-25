@@ -676,6 +676,7 @@ func (l *links) handler(state *link, linkType linkType, options linkOptions, con
 	meta := version_getBaseMetadata()
 	meta.publicKey = l.core.public
 	meta.priority = options.priority
+	meta.nodeInfo = l.core.proto.nodeinfo._getNodeInfo()
 	if len(community) > 0 {
 		meta.features |= FeatureCommunity
 		proof, err := newCommunityProof(community, l.core.public)
